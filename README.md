@@ -10,7 +10,7 @@ Current Features:
 
 ## Installation
 
-- Required [Starmap](https://github.com/StarMapLoader/StarMap) and [KittenExtensions](https://github.com/tsholmes/KittenExtensions/releases/latest)
+- Requires [Starmap](https://github.com/StarMapLoader/StarMap) and [KittenExtensions > v0.3.1](https://github.com/tsholmes/KittenExtensions/releases/latest)
 - Download zip from [Releases](https://github.com/AMPW-german/ShaderExtensions/releases/latest) and extract into game `Content` folder
 - Add to `manifest.toml` in `%USER%/my games/Kitten Space Agency`
     ```toml
