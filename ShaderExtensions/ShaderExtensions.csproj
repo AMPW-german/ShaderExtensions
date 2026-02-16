@@ -1,0 +1,73 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<Import Project="ShaderExtensions.props" />
+	<PropertyGroup>
+		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+		<TargetFramework>net10.0</TargetFramework>
+		<TargetFrameworkVersion>net10.0</TargetFrameworkVersion>
+		<LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<LangVersion>latest</LangVersion>
+		<OutputPath>bin\$(Configuration)</OutputPath>
+		<AssemblyName>$(ModName)</AssemblyName>
+		<OutputType>Library</OutputType>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+		<DebugSymbols>true</DebugSymbols>
+		<DebugType>portable</DebugType>
+		<Optimize>false</Optimize>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+		<Prefer32Bit>false</Prefer32Bit>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<DebugType>pdbonly</DebugType>
+		<Optimize>true</Optimize>
+		<DefineConstants>TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+		<Prefer32Bit>false</Prefer32Bit>
+	</PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
+		<PackageReference Include="ModMenu.Attributes" Version="1.0.1" />
+		<PackageReference Include="StarMap.API" Version="0.3.6" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="KittenExtensions">
+			<HintPath>D:\programms\Kitten Space Agency\Content\KittenExtensions\KittenExtensions.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+	</ItemGroup>
+
+  <ItemGroup>
+    <None Update="mod.toml">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+  </ItemGroup>
+
+
+	<Target Name="CopyOutputToExternalFolder" AfterTargets="Build">
+		<PropertyGroup>
+			<ExternalFolder>$(SolutionDir)Content\MPFX\</ExternalFolder>
+		</PropertyGroup>
+
+		<!-- Capture all files WITH folder structure -->
+		<ItemGroup>
+			<FilesToCopy Include="$(OutputPath)**\*" />
+		</ItemGroup>
+
+		<!-- Copy while preserving subfolders -->
+		<Copy SourceFiles="@(FilesToCopy)" DestinationFiles="@(FilesToCopy->'$(ExternalFolder)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" OverwriteReadOnlyFiles="true" />
+	</Target>
+</Project>

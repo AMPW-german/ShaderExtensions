@@ -1,0 +1,50 @@
+<Project>
+
+  <!-- Clean external folder ONCE per solution build -->
+  <Target Name="CleanExternalFolder"
+          BeforeTargets="Build"
+          Condition="'$(BuildingSolutionFile)' == 'true'
+                 and '$(ExternalFolderCleaned)' != 'true'">
+
+    <PropertyGroup>
+      <ExternalFolder>$(SolutionDir)Content\$(ModName)\</ExternalFolder>
+    </PropertyGroup>
+
+    <!-- Ensure folder exists -->
+    <MakeDir Directories="$(ExternalFolder)" />
+
+    <!-- Delete contents -->
+    <ItemGroup>
+      <FilesToDelete Include="$(ExternalFolder)**\*" />
+    </ItemGroup>
+    <Delete Files="@(FilesToDelete)" />
+
+    <!-- Mark as cleaned (global for this build) -->
+    <CreateProperty Value="true">
+    <Output TaskParameter="Value"
+            PropertyName="ExternalFolderCleaned" />
+    </CreateProperty>
+
+
+  </Target>
+
+  <!-- Copy output per project -->
+  <Target Name="CopyOutputToExternalFolder" AfterTargets="Build">
+
+    <PropertyGroup>
+      <ExternalFolder>$(SolutionDir)Content\$(ModName)\</ExternalFolder>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <FilesToCopy Include="$(OutputPath)**\*" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(FilesToCopy)"
+      DestinationFiles="@(FilesToCopy->'$(ExternalFolder)%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="false"
+      OverwriteReadOnlyFiles="true" />
+
+  </Target>
+
+</Project>
