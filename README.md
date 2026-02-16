@@ -19,6 +19,8 @@ Current Features:
     enabled = true
     ```
 
+This mod is based on KittenExtensions with large parts unmodified.
+
 ## Post Processing Shaders
 
 There are two types of post processing shaders available, pre imgui shaders and post imgui shaders.\
