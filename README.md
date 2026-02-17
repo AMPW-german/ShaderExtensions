@@ -19,7 +19,7 @@ Current Features:
     enabled = true
     ```
 
-This mod is based on KittenExtensions with large parts unmodified.
+This mod is based on [KittenExtensions](https://github.com/tsholmes/KittenExtensions) with large parts unmodified.
 
 ## Post Processing Shaders
 
