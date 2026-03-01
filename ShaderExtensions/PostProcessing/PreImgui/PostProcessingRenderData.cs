@@ -24,12 +24,12 @@ namespace ShaderExtensions.PostProcessing.PreImgui
         {
             Renderer renderer = Program.GetRenderer();
             renderer.Device.DestroyRenderPass(RenderPass.Pass, null);
-            foreach (var attachment in Attachments)
-            {
-                renderer.Device.DestroyImageView(attachment.ImageView, null);
-                //renderer.Device.DestroyImage(attachment.Image, null);
-                renderer.Device.FreeMemory(attachment.Memory, null);
-            }
+            //foreach (var attachment in Attachments)
+            //{
+            //    renderer.Device.DestroyImageView(attachment.ImageView, null);
+            //    renderer.Device.DestroyImage(attachment.Image, null);
+            //    renderer.Device.FreeMemory(attachment.Memory, null);
+            //}
             renderer.Device.DestroyFramebuffer(Framebuffer, null);
             foreach (var shader in PostProcessShaders.Values)
             {

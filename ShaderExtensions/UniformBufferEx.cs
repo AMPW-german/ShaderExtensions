@@ -19,19 +19,6 @@ namespace ShaderExtensions
 
         private static void AddUniformBufferGeneric<T>(string xmlElement) where T : unmanaged
         {
-            //KittenPiper.AddExtension().Invoke(null, new object[] {
-            //    typeof(ShaderEx),
-            //    nameof(ShaderEx.XmlBindings),
-            //    typeof(UniformBindingReference<T>),
-            //    xmlElement
-            //});
-            //KittenPiper.AddExtension().Invoke(null, new object[] {
-            //  typeof(AssetBundle),
-            //  nameof(AssetBundle.Assets),
-            //  typeof(UniformBindingReference<T>),
-            //  xmlElement
-            //});
-
             AssetEx.AddExtension(
                 typeof(ShaderEx),
                 nameof(ShaderEx.XmlBindings),

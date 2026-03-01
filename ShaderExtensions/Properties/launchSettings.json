@@ -2,7 +2,7 @@
   "profiles": {
     "StarMapStart": {
       "commandName": "Executable",
-      "executablePath": "D:\\programms\\StarMap\\StarMap.exe",
+      "executablePath": "D:\\programms\\StarMap\\StarMap.Loader.exe",
       "workingDirectory": "D:\\programms\\StarMap"
     }
   }
