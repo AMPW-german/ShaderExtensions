@@ -44,10 +44,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Reference Include="KittenExtensions">
-			<HintPath>C:\\Program Files\\Kitten Space Agency\\Content\\KittenExtensions\\KittenExtensions.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
+	  <Reference Include="KittenExtensions">
+	    <HintPath>..\..\..\..\Documents\My Games\Kitten Space Agency\mods\KittenExtensions\KittenExtensions.dll</HintPath>
+	    <Private>False</Private>
+	  </Reference>
 	</ItemGroup>
 
   <ItemGroup>

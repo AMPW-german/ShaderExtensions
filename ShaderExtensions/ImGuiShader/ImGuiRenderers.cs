@@ -89,8 +89,8 @@ namespace ShaderExtensions.ImGuiShader
             for (var i = 0; i < activeRenderers.Count; i++)
                 transitions[i] = new(
                   activeRenderers[i].Target,
-                  ImageBarrierInfo.Presets.ColorAttachment,
-                  ImageBarrierInfo.Presets.ShaderReadOnlyFragment);
+                  ImageBarrierInfo.Presets.ColorAttachmentWrite,
+                  ImageBarrierInfo.Presets.SampledReadVertex);
 
             commandBuffer.TransitionImages2(transitions);
         }

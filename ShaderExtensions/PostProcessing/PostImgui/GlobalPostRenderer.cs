@@ -276,8 +276,8 @@ namespace ShaderExtensions.PostProcessing.PostImgui
             {
                 new KSA.Rendering.ImageTransition(
                     inImage: Source.Image,
-                    inSrc: KSA.Rendering.ImageBarrierInfo.Presets.ColorAttachment,
-                    inDst: KSA.Rendering.ImageBarrierInfo.Presets.ShaderReadOnlyFragment
+                    inSrc: KSA.Rendering.ImageBarrierInfo.Presets.ColorAttachmentWrite,
+                    inDst: KSA.Rendering.ImageBarrierInfo.Presets.SampledReadFragment
                 )
             };
             commandBuffer.TransitionImages2(transitions);

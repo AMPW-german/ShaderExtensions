@@ -132,8 +132,8 @@ namespace ShaderExtensions.ImGuiShader
             commandBuffer.TransitionImages2([
               new ImageTransition(
             BaseRenderer.Target,
-            ImageBarrierInfo.Presets.ColorAttachment,
-            ImageBarrierInfo.Presets.ShaderReadOnlyVertex
+            ImageBarrierInfo.Presets.ColorAttachmentWrite,
+            ImageBarrierInfo.Presets.SampledReadVertex
           )]);
 
             var extent = new VkExtent2D(renderTarget.Extent.Width, renderTarget.Extent.Height);
