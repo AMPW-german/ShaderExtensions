@@ -277,5 +277,7 @@ Buffers can be shared between shaders by specifying `Id` without `Size`.
 </Assets>
 ```
 
+Note: the elements are aligned with std140 which means padding might be necessary for elements (like vec3 or mat3)
+
 
 [^Sximgui]: The marker key must be the hash of the string `SxImGuiShader`, but this class does not need to exist in this form in order to function, it is just a utility.
