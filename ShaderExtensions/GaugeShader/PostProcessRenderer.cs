@@ -1,5 +1,3 @@
-
-using System;
 using Brutal.Numerics;
 using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
@@ -138,10 +136,15 @@ namespace ShaderExtensions.GaugeShader
         }]);
             commandBuffer.SetScissor(0, [rect]);
 
+            int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
+            dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(viewport.Index);
+            dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
+
             commandBuffer.BindDescriptorSets(
               VkPipelineBindPoint.Graphics, PipelineLayout, 0,
               [GlobalShaderBindings.DescriptorSet, bindingSet],
-              [GlobalShaderBindings.DynamicOffset(viewport.Index)]);
+              dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
 

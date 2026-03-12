@@ -267,7 +267,7 @@ namespace ShaderExtensions.PostProcessing.PreImgui
         );
 
 
-        public unsafe void RenderSinglePass(
+        public void RenderSinglePass(
             CommandBuffer commandBuffer,
             RenderPassState singleRenderPass,
             VkFramebuffer frameBuffer
@@ -302,18 +302,22 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                 }]);
             commandBuffer.SetScissor(0, [rect]);
 
+            int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
+            dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
+            dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
+
             commandBuffer.BindDescriptorSets(
               VkPipelineBindPoint.Graphics, PipelineLayout, 0,
               [GlobalShaderBindings.DescriptorSet, bindingSet],
-              [GlobalShaderBindings.DynamicOffset(0)]);
+              dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
 
             commandBuffer.EndRenderPass();
         }
 
-
-        public unsafe void RenderSubpass(CommandBuffer commandBuffer)
+        public void RenderSubpass(CommandBuffer commandBuffer)
         {
             commandBuffer.BindPipeline(
                 VkPipelineBindPoint.Graphics,
@@ -329,12 +333,17 @@ namespace ShaderExtensions.PostProcessing.PreImgui
             var rect = new VkRect2D(extent);
             commandBuffer.SetScissor(0, [rect]);
 
+            int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
+            dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
+            dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
+
             commandBuffer.BindDescriptorSets(
                 VkPipelineBindPoint.Graphics,
                 PipelineLayout,
                 0,
                 [GlobalShaderBindings.DescriptorSet, bindingSet],
-                [GlobalShaderBindings.DynamicOffset(0)]);
+                dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
         }

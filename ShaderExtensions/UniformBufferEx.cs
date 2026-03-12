@@ -7,6 +7,8 @@ namespace ShaderExtensions
 {
     public static class UniformBufferEx
     {
+        public static readonly Brutal.ByteSize32 minUniformBufferOffsetAlignment = (Brutal.ByteSize32)256;
+
         public static void AddUniformBuffer(Type type, string xmlElement)
         {
             var method = typeof(UniformBufferEx).GetMethod(

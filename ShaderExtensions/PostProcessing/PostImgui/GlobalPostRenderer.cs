@@ -301,10 +301,15 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                 }]);
             commandBuffer.SetScissor(0, [rect]);
 
+            int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
+            dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
+            dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
+
             commandBuffer.BindDescriptorSets(
               VkPipelineBindPoint.Graphics, PipelineLayout, 0,
               [GlobalShaderBindings.DescriptorSet, bindingSet],
-              [GlobalShaderBindings.DynamicOffset(0)]);
+              dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
 
@@ -328,12 +333,17 @@ namespace ShaderExtensions.PostProcessing.PostImgui
             var rect = new VkRect2D(extent);
             commandBuffer.SetScissor(0, [rect]);
 
+            int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
+            dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
+            dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
+
             commandBuffer.BindDescriptorSets(
                 VkPipelineBindPoint.Graphics,
                 PipelineLayout,
                 0,
                 [GlobalShaderBindings.DescriptorSet, bindingSet],
-                [GlobalShaderBindings.DynamicOffset(0)]);
+                dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
         }
