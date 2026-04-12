@@ -15,6 +15,8 @@ namespace ShaderExtensions.ImGuiShader
         [XmlElement("Fragment")]
         public ShaderEx Fragment;
 
+        public int LookupIndex { get; set; }
+
         public override void OnDataLoad(Mod mod)
         {
             base.OnDataLoad(mod);

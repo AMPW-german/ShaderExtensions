@@ -67,6 +67,9 @@ namespace ShaderExtensions
 
         public VkDescriptorType DescriptorType => VkDescriptorType.UniformBufferDynamic;
         public int DescriptorCount => 1;
+
+        public int LookupIndex { get; set; }
+
         public IShaderBinding Get() => IsReference() ? IShaderBinding.Bindings.Get(Hash) : this;
 
         public override bool IsReference() => Size <= 0;

@@ -186,6 +186,7 @@ namespace ShaderExtensions
             {
                 GlobalPostShaderHandler.offscreenTarget2 = new OffscreenTarget(
                     renderer,
+                    "ShaderExtensionsImGuiPreRender",
                     renderer.Extent,
                     renderer.ColorFormat,
                     renderer.DepthFormat

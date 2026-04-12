@@ -29,7 +29,7 @@ namespace ShaderExtensions.ImGuiShader
           : base(nameof(ImGuiPostRenderer), renderer, Program.MainPass, [vert, frag])
         {
             BaseRenderer = new(renderer, extent);
-            renderTarget = new(renderer, extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+            renderTarget = new(renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderPass = renderTarget.CreateRenderPass();
             renderTarget.BuildFramebuffer(renderPass);
 
@@ -96,7 +96,7 @@ namespace ShaderExtensions.ImGuiShader
 
             ImGuiBackend.Vulkan.RemoveTexture(ImGuiTexture);
             renderTarget.Dispose();
-            renderTarget = new(Renderer, extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+            renderTarget = new(Renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderTarget.BuildFramebuffer(renderPass);
             ImGuiTexture = ImGuiBackend.Vulkan.AddTexture(
               Program.LinearClampedSampler,

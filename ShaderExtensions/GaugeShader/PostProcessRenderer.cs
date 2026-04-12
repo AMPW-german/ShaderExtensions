@@ -26,7 +26,7 @@ namespace ShaderExtensions.GaugeShader
         {
             this.canvas = canvas;
 
-            renderTarget = new(renderer, new(500, 500), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+            renderTarget = new(renderer, this.GetHashCode().ToString(), new(500, 500), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderPass = renderTarget.CreateRenderPass();
             renderTarget.BuildFramebuffer(renderPass);
 
@@ -88,7 +88,7 @@ namespace ShaderExtensions.GaugeShader
             Renderer.Device.WaitIdle();
             ImGuiBackend.Vulkan.RemoveTexture(canvas.CanvasRenderer.ImguiTextureID);
             renderTarget.Dispose();
-            renderTarget = new(Renderer, new((int)size.X, (int)size.Y), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+            renderTarget = new(Renderer, this.GetHashCode().ToString(), new((int)size.X, (int)size.Y), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderTarget.BuildFramebuffer(renderPass);
             canvas.CanvasRenderer.ImguiTextureID =
               ImGuiBackend.Vulkan.AddTexture(Program.LinearClampedSampler, renderTarget.ColorImage.ImageView);

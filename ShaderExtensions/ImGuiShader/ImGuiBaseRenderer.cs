@@ -70,9 +70,9 @@ namespace ShaderExtensions.ImGuiShader
         public ImGuiBaseRenderer(Renderer renderer, VkExtent2D extent)
           : base(nameof(ImGuiBaseRenderer), renderer, Program.MainPass, BaseShaders)
         {
-            buffers = new BufferPair[renderer.ImageCount];
+            buffers = new BufferPair[renderer.SwapchainImageCount];
 
-            renderTarget = new(renderer, extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+            renderTarget = new(renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderPass = renderTarget.CreateRenderPass();
             renderTarget.BuildFramebuffer(renderPass);
 
@@ -105,7 +105,7 @@ namespace ShaderExtensions.ImGuiShader
         {
             Renderer.Device.WaitIdle();
             renderTarget.Dispose();
-            renderTarget = new(Renderer, extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+            renderTarget = new(Renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderTarget.BuildFramebuffer(renderPass);
 
             RebuildFrameResources();
