@@ -1,4 +1,5 @@
 ﻿using Brutal;
+using Brutal.Collections;
 using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
 using Core;
@@ -16,21 +17,21 @@ namespace ShaderExtensions.PostProcessing.PreImgui
         public FramebufferAttachment[] Attachments { get; private set; }
         public FramebufferAttachment SourceAttachment { get; private set; }
         public FramebufferAttachment TargetAttachment => Attachments.LastOrDefault();
-        public VkFramebuffer Framebuffer { get; private set; }
+        public VkFramebuffer RenderFramebuffer { get; private set; }
         public SortedDictionary<int, PostProcessingRenderer> PostProcessShaders { get; private set; }
-
+        public string Name { get; private set; }
 
         public void Dispose()
         {
             Renderer renderer = Program.GetRenderer();
             renderer.Device.DestroyRenderPass(RenderPass.Pass, null);
-            //foreach (var attachment in Attachments)
-            //{
-            //    renderer.Device.DestroyImageView(attachment.ImageView, null);
-            //    renderer.Device.DestroyImage(attachment.Image, null);
-            //    renderer.Device.FreeMemory(attachment.Memory, null);
-            //}
-            renderer.Device.DestroyFramebuffer(Framebuffer, null);
+            renderer.Device.DestroyFramebuffer(RenderFramebuffer, null);
+            FramebufferAttachment[] attachments = Attachments;
+            foreach (FramebufferAttachment attachment in attachments)
+            {
+                renderer.Device.DestroyImageView(attachment.ImageView, null);
+                attachment.AllocatedImage.Dispose();
+            }
             foreach (var shader in PostProcessShaders.Values)
             {
                 shader.Dispose();
@@ -67,14 +68,14 @@ namespace ShaderExtensions.PostProcessing.PreImgui
 
             if (UniqueRenderPass)
             {
-                PostProcessShaders[0].RenderSinglePass(commandBuffer, RenderPass, Framebuffer);
+                PostProcessShaders[0].RenderSinglePass(commandBuffer, RenderPass, RenderFramebuffer);
             }
             else
             {
                 commandBuffer.BeginRenderPass(new VkRenderPassBeginInfo
                 {
                     RenderPass = RenderPass.Pass,
-                    Framebuffer = Framebuffer,
+                    Framebuffer = RenderFramebuffer,
                     RenderArea = new VkRect2D(extent),
                 }, VkSubpassContents.Inline);
 
@@ -102,10 +103,19 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                 throw new Exception("Multiple unique renderpass shaders in the same pass are not supported.");
             }
 
+            Name = $"ShaderExtensions_PostProcessingRenderData_Pass{shaders[0].RenderPassId}{(uniqueRenderPassCount > 0 ? "_Unique" : "")}";
+
             Renderer renderer = Program.GetRenderer();
             RenderPassIndex = shaders[0].RenderPassId;
             SubPassCount = shaders.Count;
             SourceAttachment = source;
+
+            VkExtent3D extent = new VkExtent3D
+            {
+                Width = renderer.Extent.Width,
+                Height = renderer.Extent.Height,
+                Depth = 1
+            };
 
             VkImageSubresourceRange subresourceRange = new VkImageSubresourceRange();
             {
@@ -115,27 +125,8 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                 subresourceRange.BaseMipLevel = 0;
                 subresourceRange.BaseArrayLayer = 0;
             }
-            ;
 
-            VkImageCreateInfo imageCreateInfo = new VkImageCreateInfo
-            {
-                ImageType = VkImageType._2D,
-                Flags = VkImageCreateFlags.None,
-                Format = colorFormat,
-                Extent = new VkExtent3D
-                {
-                    Width = renderer.Extent.Width,
-                    Height = renderer.Extent.Height,
-                    Depth = 1
-                },
-                MipLevels = 1,
-                ArrayLayers = 1,
-                Samples = VkSampleCountFlags._1Bit,
-                Usage = VkImageUsageFlags.ColorAttachmentBit |
-                        VkImageUsageFlags.InputAttachmentBit |
-                        VkImageUsageFlags.TransferSrcBit |
-                        VkImageUsageFlags.SampledBit
-            };
+            VkImageUsageFlags imageUsageFlags = VkImageUsageFlags.ColorAttachmentBit | VkImageUsageFlags.InputAttachmentBit | VkImageUsageFlags.TransferSrcBit | VkImageUsageFlags.SampledBit;
 
             if (SubPassCount == 1 && shaders[0].RequiresUniqueRenderpass)
             {
@@ -143,16 +134,30 @@ namespace ShaderExtensions.PostProcessing.PreImgui
 
                 Attachments = new FramebufferAttachment[1]; // Sampler2D as input, ColorAttachment as output
 
-                FramebufferAttachment attachment = new FramebufferAttachment()
+                FramebufferAttachment attachment = new FramebufferAttachment();
+                attachment.Format = colorFormat;
+                attachment.AllocatedImage = renderer.Allocator.CreateImage(new ImageEx.CreateInfo
                 {
-                    Image = renderer.Device.CreateImage(imageCreateInfo, null),
-                    Format = colorFormat,
-                };
-
-                attachment.Memory = renderer.Device.AllocateMemory(renderer.PhysicalDevice, attachment.Image, VkMemoryPropertyFlags.DeviceLocalBit, null);
-                renderer.Device.BindImageMemory(attachment.Image, attachment.Memory, (ByteSize64)ByteSize.Zero);
+                    Name = $"{Name}_Attachment0",
+                    ImageType = VkImageType._2D,
+                    ImageFormat = colorFormat,
+                    ImageExtent = extent,
+                    ImageMipLevels = 1,
+                    ImageArrayLayers = 1,
+                    ImageSamples = VkSampleCountFlags._1Bit,
+                    ImageTiling = VkImageTiling.Optimal,
+                    ImageUsage = imageUsageFlags,
+                    ImageInitialLayout = VkImageLayout.Undefined,
+                    AllocRequiredProperties = VkMemoryPropertyFlags.DeviceLocalBit
+                });
                 attachment.SubresourceRange = subresourceRange;
-
+                attachment.ImageView = renderer.Device.CreateImageView(new VkImageViewCreateInfo
+                {
+                    Image = attachment.Image,
+                    ViewType = VkImageViewType._2D,
+                    Format = colorFormat,
+                    SubresourceRange = subresourceRange
+                }, null);
                 VkImageViewCreateInfo imageViewCreateInfo = new VkImageViewCreateInfo
                 {
                     Image = attachment.Image,
@@ -160,8 +165,8 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                     Format = colorFormat,
                     SubresourceRange = subresourceRange
                 };
-
                 attachment.ImageView = renderer.Device.CreateImageView(imageViewCreateInfo, null);
+
                 Attachments[0] = attachment;
 
                 RenderPass = PostProcessingRenderer.CreateSingleRenderPass(renderer, colorFormat);
@@ -177,13 +182,13 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                     Height = renderer.Extent.Height,
                     Layers = 1
                 };
-                Framebuffer = renderer.Device.CreateFramebuffer(fbInfo, null);
+                RenderFramebuffer = renderer.Device.CreateFramebuffer(fbInfo, null);
 
                 PostProcessShaders = new SortedDictionary<int, PostProcessingRenderer> {
-                        {
-                            0, new PostProcessingRenderer(renderer, source, RenderPass, shaders[0], uniqueRenderpass: true)
-                        }
-                    };
+                    {
+                        0, new PostProcessingRenderer(renderer, source, RenderPass, shaders[0], uniqueRenderpass: true)
+                    }
+                };
             }
             else
             {
@@ -192,16 +197,30 @@ namespace ShaderExtensions.PostProcessing.PreImgui
 
                 for (int i = 1; i <= SubPassCount; i++)
                 {
-                    FramebufferAttachment attachment = new FramebufferAttachment()
+                    FramebufferAttachment attachment = new FramebufferAttachment();
+                    attachment.Format = colorFormat;
+                    attachment.AllocatedImage = renderer.Allocator.CreateImage(new ImageEx.CreateInfo
                     {
-                        Image = renderer.Device.CreateImage(imageCreateInfo, null),
-                        Format = colorFormat,
-                    };
-
-                    attachment.Memory = renderer.Device.AllocateMemory(renderer.PhysicalDevice, attachment.Image, VkMemoryPropertyFlags.DeviceLocalBit, null);
-                    renderer.Device.BindImageMemory(attachment.Image, attachment.Memory, (ByteSize64)ByteSize.Zero);
+                        Name = $"{Name}_Attachment{i}",
+                        ImageType = VkImageType._2D,
+                        ImageFormat = colorFormat,
+                        ImageExtent = extent,
+                        ImageMipLevels = 1,
+                        ImageArrayLayers = 1,
+                        ImageSamples = VkSampleCountFlags._1Bit,
+                        ImageTiling = VkImageTiling.Optimal,
+                        ImageUsage = imageUsageFlags,
+                        ImageInitialLayout = VkImageLayout.Undefined,
+                        AllocRequiredProperties = VkMemoryPropertyFlags.DeviceLocalBit
+                    });
                     attachment.SubresourceRange = subresourceRange;
-
+                    attachment.ImageView = renderer.Device.CreateImageView(new VkImageViewCreateInfo
+                    {
+                        Image = attachment.Image,
+                        ViewType = VkImageViewType._2D,
+                        Format = colorFormat,
+                        SubresourceRange = subresourceRange
+                    }, null);
                     VkImageViewCreateInfo imageViewCreateInfo = new VkImageViewCreateInfo
                     {
                         Image = attachment.Image,
@@ -209,7 +228,6 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                         Format = colorFormat,
                         SubresourceRange = subresourceRange
                     };
-
                     attachment.ImageView = renderer.Device.CreateImageView(imageViewCreateInfo, null);
                     Attachments[i] = attachment;
                 }
@@ -228,7 +246,7 @@ namespace ShaderExtensions.PostProcessing.PreImgui
                     Height = renderer.Extent.Height,
                     Layers = 1
                 };
-                Framebuffer = renderer.Device.CreateFramebuffer(fbInfo, null);
+                RenderFramebuffer = renderer.Device.CreateFramebuffer(fbInfo, null);
 
                 shaders.Sort((a, b) => a.SubpassId.CompareTo(b.SubpassId));
                 PostProcessShaders = new SortedDictionary<int, PostProcessingRenderer>();
