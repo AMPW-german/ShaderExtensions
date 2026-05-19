@@ -4,7 +4,6 @@ Post Processing Shaders and uniform buffers for KSA
 
 Current Features:
 - Adds a `<ShaderEx>` asset that allows adding additional texture and uniform buffer bindings to fragment shaders
-- Adds a `<GaugeCanvasEx>` asset that allows adding a post-processing shader to the rendered gauge
 - Adds a `<ImGuiShader>` asset that allows running a custom shader for a specific window
 - Adds `<PostProcessingShader>` and `<GlobalPostShader>` assets to run post processing shaders pre/post imgui
 
@@ -77,32 +76,6 @@ void main()
 {
     vec4 c = texture(Source, Uv);
     outColor = c;
-}
-```
-
-## GaugeCanvas Post-Processing
-
-To add a post-processing shader to a Gauge, use the `<GaugeCanvasEx>` element and add a vertex and fragment shader to it. The included `GaugeVertexPost` vertex shader draws one rect covering the entire gauge, and can be used in most cases. The fragment shader is a `ShaderEx` asset that will have `layout(set=1, binding=0)` bound to the rendered gauge canvas, with custom bindings starting at `layout(set=1, binding=1)`.
-
-```xml
-<Assets>
-  <GaugeCanvasEx>
-    <PostVertex Id="GaugeVertexPost" />
-    <PostFragment Path="MyPost.frag" />
-  </GaugeCanvasEx>
-</Assets>
-```
-
-```glsl
-#version 450
-
-layout(location = 0) in vec2 inUv;
-layout(location = 0) out vec4 outColor;
-layout(set = 1, binding = 0) uniform sampler2D gaugeCanvas;
-
-void main()
-{
-  outColor = textureLod(gaugeCanvas, inUv, 0);
 }
 ```
 
@@ -179,7 +152,7 @@ The rendering data from ImGui does not include any window information, only a li
 
 ## Additional bindings
 
-Additional bindings can be added to a shader by using the `ShaderEx` top-level tag, or the `FragmentEx` tag in a gauge component. Top-level defined shaders will still only have the additional bindings injected when used as a post processing or gauge component fragment shader
+Additional bindings can only be added to a post processing shaders using one of the tags from ShaderExtensions
 
 ```xml
 <Assets>
@@ -201,7 +174,7 @@ Additional bindings can be added to a shader by using the `ShaderEx` top-level t
 </Component>
 ```
 
-The additional bindings will be available in the fragment shader on set 1, starting from binding 1 (binding 0 will be the existing gauge font atlas)
+The additional bindings will be available in the fragment shader on set 1, starting from binding 1
 
 ```glsl
 // in MyShader.frag
@@ -278,6 +251,5 @@ Buffers can be shared between shaders by specifying `Id` without `Size`.
 ```
 
 Note: the elements are aligned with std140 which means padding might be necessary for elements (like vec3 or mat3)
-
 
 [^Sximgui]: The marker key must be the hash of the string `SxImGuiShader`, but this class does not need to exist in this form in order to function, it is just a utility.

@@ -23,107 +23,109 @@ namespace ShaderExtensions
             AssetEx.Init();
         }
 
-        private static FieldInfo CanvasRenderer_canvas =
-  typeof(CanvasRenderer).GetField("_canvas", BindingFlags.Instance | BindingFlags.NonPublic);
+        // No working test case available
 
-        [HarmonyPatch(
-          typeof(CanvasRenderer), MethodType.Constructor, [typeof(GaugeCanvas), typeof(RendererContext)]
-        ), HarmonyTranspiler]
-        internal static IEnumerable<CodeInstruction> CanvasRenderer_Ctor_Transpile(
-          IEnumerable<CodeInstruction> instructions)
-        {
-            var matcher = new CodeMatcher(instructions);
-            TranspileAddTexture("CanvasRenderer.ctor", matcher);
-            return matcher.Instructions();
-        }
+        //      private static FieldInfo CanvasRenderer_canvas =
+        //typeof(CanvasRenderer).GetField("_canvas", BindingFlags.Instance | BindingFlags.NonPublic);
 
-        [HarmonyPatch(typeof(CanvasRenderer), nameof(CanvasRenderer.Resize)), HarmonyTranspiler]
-        internal static IEnumerable<CodeInstruction> CanvasRenderer_Resize_Transpile(
-          IEnumerable<CodeInstruction> instructions)
-        {
-            var matcher = new CodeMatcher(instructions);
+        //      [HarmonyPatch(
+        //        typeof(CanvasRenderer), MethodType.Constructor, [typeof(GaugeCanvas), typeof(RendererContext)]
+        //      ), HarmonyTranspiler]
+        //      internal static IEnumerable<CodeInstruction> CanvasRenderer_Ctor_Transpile(
+        //        IEnumerable<CodeInstruction> instructions)
+        //      {
+        //          var matcher = new CodeMatcher(instructions);
+        //          TranspileAddTexture("CanvasRenderer.ctor", matcher);
+        //          return matcher.Instructions();
+        //      }
 
-            matcher.MatchStartForward(CodeMatch.Calls(() => default(ImGuiBackendVulkanImpl).RemoveTexture(default)));
-            matcher.ThrowIfInvalid($"could not find ImGuiVulkanBackendImpl.RemoveTexture call in CanvasRenderer.Resize");
+        //      [HarmonyPatch(typeof(CanvasRenderer), nameof(CanvasRenderer.Resize)), HarmonyTranspiler]
+        //      internal static IEnumerable<CodeInstruction> CanvasRenderer_Resize_Transpile(
+        //        IEnumerable<CodeInstruction> instructions)
+        //      {
+        //          var matcher = new CodeMatcher(instructions);
 
-            matcher.RemoveInstruction();
-            matcher.InsertAndAdvance(
-              new CodeInstruction(OpCodes.Ldarg_0),
-              new CodeInstruction(OpCodes.Ldfld, CanvasRenderer_canvas),
-              CodeInstruction.Call(() => VulkanRemoveTexture(default, default, default)));
+        //          matcher.MatchStartForward(CodeMatch.Calls(() => default(ImGuiBackendVulkanImpl).RemoveTexture(default)));
+        //          matcher.ThrowIfInvalid($"could not find ImGuiVulkanBackendImpl.RemoveTexture call in CanvasRenderer.Resize");
 
-            TranspileAddTexture("CanvasRenderer.Resize", matcher);
+        //          matcher.RemoveInstruction();
+        //          matcher.InsertAndAdvance(
+        //            new CodeInstruction(OpCodes.Ldarg_0),
+        //            new CodeInstruction(OpCodes.Ldfld, CanvasRenderer_canvas),
+        //            CodeInstruction.Call(() => VulkanRemoveTexture(default, default, default)));
 
-            return matcher.Instructions();
-        }
+        //          TranspileAddTexture("CanvasRenderer.Resize", matcher);
 
-        private static void VulkanAddTexture(
-          CanvasRenderer canvasRenderer, ImGuiBackendVulkanImpl vulkan, VkSampler sampler,
-          VkImageView imageView, VkImageLayout imageLayout, GaugeCanvas canvas)
-        {
-            if (canvas is not GaugeCanvasEx { HasPost: true })
-                canvasRenderer.ImguiTextureID = vulkan.AddTexture(sampler, imageView, imageLayout);
-        }
+        //          return matcher.Instructions();
+        //      }
 
-        private static void VulkanRemoveTexture(
-          ImGuiBackendVulkanImpl vulkan, ImTextureRef texture, GaugeCanvas canvas)
-        {
-            if (canvas is not GaugeCanvasEx { HasPost: true })
-                vulkan.RemoveTexture(texture);
-        }
+        //private static void VulkanAddTexture(
+        //  CanvasRenderer canvasRenderer, ImGuiBackendVulkanImpl vulkan, VkSampler sampler,
+        //  VkImageView imageView, VkImageLayout imageLayout, GaugeCanvas canvas)
+        //{
+        //    if (canvas is not GaugeCanvasEx { HasPost: true })
+        //        canvasRenderer.ImguiTextureID = vulkan.AddTexture(sampler, imageView, imageLayout);
+        //}
 
-        private static void TranspileAddTexture(string name, CodeMatcher matcher)
-        {
-            matcher.MatchStartForward(
-              CodeMatch.Calls(() => default(ImGuiBackendVulkanImpl).AddTexture(default, default)));
-            matcher.ThrowIfInvalid($"could not find ImGuiVulkanBackendImpl.AddTexture call in {name}");
+        //private static void VulkanRemoveTexture(
+        //  ImGuiBackendVulkanImpl vulkan, ImTextureRef texture, GaugeCanvas canvas)
+        //{
+        //    if (canvas is not GaugeCanvasEx { HasPost: true })
+        //        vulkan.RemoveTexture(texture);
+        //}
 
-            matcher.RemoveInstruction(); // remove call
-            matcher.RemoveInstruction(); // remove store
-            matcher.InsertAndAdvance(
-              new CodeInstruction(OpCodes.Ldarg_0),
-              new CodeInstruction(OpCodes.Ldfld, CanvasRenderer_canvas),
-              CodeInstruction.Call(() => VulkanAddTexture(default, default, default, default, default, default)));
-        }
+        //private static void TranspileAddTexture(string name, CodeMatcher matcher)
+        //{
+        //    matcher.MatchStartForward(
+        //      CodeMatch.Calls(() => default(ImGuiBackendVulkanImpl).AddTexture(default, default)));
+        //    matcher.ThrowIfInvalid($"could not find ImGuiVulkanBackendImpl.AddTexture call in {name}");
 
-        [HarmonyPatch(typeof(GaugeCanvas), nameof(GaugeCanvas.PrepareCanvas)), HarmonyTranspiler]
-        internal static IEnumerable<CodeInstruction> GaugeCanvas_PrepareCanvas_Transpile(
-          IEnumerable<CodeInstruction> instructions)
-        {
-            var matcher = new CodeMatcher(instructions);
+        //    matcher.RemoveInstruction(); // remove call
+        //    matcher.RemoveInstruction(); // remove store
+        //    matcher.InsertAndAdvance(
+        //      new CodeInstruction(OpCodes.Ldarg_0),
+        //      new CodeInstruction(OpCodes.Ldfld, CanvasRenderer_canvas),
+        //      CodeInstruction.Call(() => VulkanAddTexture(default, default, default, default, default, default)));
+        //}
 
-            matcher.MatchStartForward(CodeMatch.Calls(() => default(GaugeCanvas).CacheTransform));
-            matcher.ThrowIfInvalid("could not find GaugeCanvas.CacheTransform call in GaugeCanvas.PrepareCanvas");
+        //[HarmonyPatch(typeof(GaugeCanvas), nameof(GaugeCanvas.PrepareCanvas)), HarmonyTranspiler]
+        //internal static IEnumerable<CodeInstruction> GaugeCanvas_PrepareCanvas_Transpile(
+        //  IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var matcher = new CodeMatcher(instructions);
 
-            matcher.InsertAndAdvance(
-              new CodeInstruction(OpCodes.Ldarg_1),
-              CodeInstruction.Call(() => GaugeCanvas_CreatePost(default, default))
-            );
+        //    matcher.MatchStartForward(CodeMatch.Calls(() => default(GaugeCanvas).CacheTransform));
+        //    matcher.ThrowIfInvalid("could not find GaugeCanvas.CacheTransform call in GaugeCanvas.PrepareCanvas");
 
-            return matcher.Instructions();
-        }
+        //    matcher.InsertAndAdvance(
+        //      new CodeInstruction(OpCodes.Ldarg_1),
+        //      CodeInstruction.Call(() => GaugeCanvas_CreatePost(default, default))
+        //    );
 
-        private static GaugeCanvas GaugeCanvas_CreatePost(GaugeCanvas canvas, RendererContext context)
-        {
-            if (canvas is GaugeCanvasEx canvasEx && canvasEx.HasPost)
-                canvasEx.PostRenderer = new(canvasEx, context, context, [canvasEx.Vertex.Get(), canvasEx.Fragment.Get()]);
-            return canvas;
-        }
+        //    return matcher.Instructions();
+        //}
 
-        [HarmonyPatch(typeof(GaugeCanvas), nameof(GaugeCanvas.CacheTransform)), HarmonyPostfix]
-        internal static void GaugeCanvas_CacheTransform_Postfix(GaugeCanvas __instance)
-        {
-            if (__instance is GaugeCanvasEx canvasEx && canvasEx.HasPost)
-                canvasEx.PostRenderer.Resize(canvasEx.RenderResolution);
-        }
+        //private static GaugeCanvas GaugeCanvas_CreatePost(GaugeCanvas canvas, RendererContext context)
+        //{
+        //    if (canvas is GaugeCanvasEx canvasEx && canvasEx.HasPost)
+        //        canvasEx.PostRenderer = new(canvasEx, context, context, [canvasEx.Vertex.Get(), canvasEx.Fragment.Get()]);
+        //    return canvas;
+        //}
 
-        [HarmonyPatch(typeof(GaugeCanvas), nameof(GaugeCanvas.Render)), HarmonyPostfix]
-        internal static void GaugeCanvas_Render_Postfix(
-          GaugeCanvas __instance, CommandBuffer commandBuffer, Viewport activeViewport)
-        {
-            if (__instance is GaugeCanvasEx canvasEx && canvasEx.HasPost)
-                canvasEx.PostRenderer.Render(commandBuffer, activeViewport);
-        }
+        //[HarmonyPatch(typeof(GaugeCanvas), nameof(GaugeCanvas.CacheTransform)), HarmonyPostfix]
+        //internal static void GaugeCanvas_CacheTransform_Postfix(GaugeCanvas __instance)
+        //{
+        //    if (__instance is GaugeCanvasEx canvasEx && canvasEx.HasPost)
+        //        canvasEx.PostRenderer.Resize(canvasEx.RenderResolution);
+        //}
+
+        //[HarmonyPatch(typeof(GaugeCanvas), nameof(GaugeCanvas.Render)), HarmonyPostfix]
+        //internal static void GaugeCanvas_Render_Postfix(
+        //  GaugeCanvas __instance, CommandBuffer commandBuffer, Viewport activeViewport)
+        //{
+        //    if (__instance is GaugeCanvasEx canvasEx && canvasEx.HasPost)
+        //        canvasEx.PostRenderer.Render(commandBuffer, activeViewport);
+        //}
 
         [HarmonyPatch(typeof(Program), "RenderGame"), HarmonyTranspiler, HarmonyDebug]
         internal static IEnumerable<CodeInstruction> Program_RenderGame_Transpile(
@@ -218,60 +220,62 @@ namespace ShaderExtensions
     }
 
 
-    [HarmonyPatch]
-    internal static class GaugeRendererPatch
-    {
-        [HarmonyTargetMethod]
-        internal static MethodBase TargetMethod() =>
-          typeof(GaugeRenderer).GetConstructor([
-            typeof(GaugeCanvas), typeof(GaugeComponent), typeof(RendererContext), typeof(Span<ShaderReference>)
-          ]);
+    // KSA v2026.5.10.4424 reworked the GaugeRenderer and is now GaugeBundle
+    // Since I don't have a test case for this and I don't think it was used by anyone (except KSASM which wasn't updated in months), I'm leaving this patch here but commented out for now.
+    //[HarmonyPatch]
+    //internal static class GaugeBundlePatch
+    //{
+    //    [HarmonyTargetMethod]
+    //    internal static MethodBase TargetMethod() =>
+    //      typeof(GaugeBundle).GetConstructor([
+    //        typeof(GaugeCanvas), typeof(IReadOnlyList<GaugeComponent>), typeof(RendererContext), typeof(Span<ShaderReference>)
+    //      ]);
 
-        [HarmonyTranspiler]
-        internal static IEnumerable<CodeInstruction> GaugeRenderer_Ctor_Tranpsile(
-          IEnumerable<CodeInstruction> instructions)
-        {
-            var matcher = new CodeMatcher(instructions);
+    //    [HarmonyTranspiler]
+    //    internal static IEnumerable<CodeInstruction> GaugeBundle_Ctor_Tranpsile(
+    //      IEnumerable<CodeInstruction> instructions)
+    //    {
+    //        var matcher = new CodeMatcher(instructions);
 
-            Span<CodeInstruction> extraArgs = [
-              new CodeInstruction(OpCodes.Ldarg_2) // add GaugeComponent arg
-            ];
-            var fr = new MatcherFindReplace(matcher, "GaugeRenderer.ctor", extraArgs);
+    //        Span<CodeInstruction> extraArgs = [
+    //          new CodeInstruction(OpCodes.Ldarg_2) // add GaugeComponent arg
+    //        ];
+    //        //var fr = new MatcherFindReplace(matcher, "GaugeBundle.ctor", extraArgs);
 
-            fr.FindReplace(
-              typeof(DescriptorPoolExExtensions).GetMethod(nameof(DescriptorPoolExExtensions.CreateDescriptorPool)),
-              typeof(GaugeRendererPatch).GetMethod(nameof(CreateDescriptorPool))
-            );
+    //        //fr.FindReplace(
+    //        //  typeof(DescriptorPoolExExtensions).GetMethod(nameof(DescriptorPoolExExtensions.CreateDescriptorPool)),
+    //        //  typeof(GaugeBundlePatch).GetMethod(nameof(CreateDescriptorPool))
+    //        //);
 
-            fr.FindReplace(
-              typeof(DescriptorSetLayoutExExtensions).GetMethod(
-                nameof(DescriptorSetLayoutExExtensions.CreateDescriptorSetLayout)),
-              typeof(GaugeRendererPatch).GetMethod(nameof(CreateDescriptorSetLayout))
-            );
+    //        //fr.FindReplace(
+    //        //  typeof(DescriptorSetLayoutExExtensions).GetMethod(
+    //        //    nameof(DescriptorSetLayoutExExtensions.CreateDescriptorSetLayout)),
+    //        //  typeof(GaugeBundlePatch).GetMethod(nameof(CreateDescriptorSetLayout))
+    //        //);
 
-            fr.FindReplace(
-              typeof(VkDeviceExtensions).GetMethod(nameof(VkDeviceExtensions.UpdateDescriptorSets)),
-              typeof(GaugeRendererPatch).GetMethod(nameof(UpdateDescriptorSets))
-            );
+    //        //fr.FindReplace(
+    //        //  typeof(VkDeviceExtensions).GetMethod(nameof(VkDeviceExtensions.UpdateDescriptorSets)),
+    //        //  typeof(GaugeBundlePatch).GetMethod(nameof(UpdateDescriptorSets))
+    //        //);
 
-            return matcher.Instructions();
-        }
+    //        return matcher.Instructions();
+    //    }
 
-        public static DescriptorPoolEx CreateDescriptorPool(
-          Device device, DescriptorPoolEx.CreateInfo createInfo, VkAllocator allocator, GaugeComponent component
-        ) => ShaderEx.CreateDescriptorPool(component.FragmentShader, device, createInfo, allocator);
+    //    public static DescriptorPoolEx CreateDescriptorPool(
+    //      Device device, DescriptorPoolEx.CreateInfo createInfo, VkAllocator allocator, GaugeComponent component
+    //    ) => ShaderEx.CreateDescriptorPool(component.FragmentShader, device, createInfo, allocator);
 
-        public static DescriptorSetLayoutEx CreateDescriptorSetLayout(
-          Device device, DescriptorSetLayoutEx.CreateInfo createInfo, VkAllocator allocator, GaugeComponent component
-        ) => ShaderEx.CreateDescriptorSetLayout(component.FragmentShader, device, createInfo, allocator);
+    //    public static DescriptorSetLayoutEx CreateDescriptorSetLayout(
+    //      Device device, DescriptorSetLayoutEx.CreateInfo createInfo, VkAllocator allocator, GaugeComponent component
+    //    ) => ShaderEx.CreateDescriptorSetLayout(component.FragmentShader, device, createInfo, allocator);
 
-        public static void UpdateDescriptorSets(
-          Device device,
-          ReadOnlySpan<VkWriteDescriptorSet> pDescriptorWrites,
-          ReadOnlySpan<VkCopyDescriptorSet> pDescriptorCopies,
-          GaugeComponent component
-        ) => ShaderEx.UpdateDescriptorSets(component.FragmentShader, device, pDescriptorWrites);
-    }
+    //    public static void UpdateDescriptorSets(
+    //      Device device,
+    //      ReadOnlySpan<VkWriteDescriptorSet> pDescriptorWrites,
+    //      ReadOnlySpan<VkCopyDescriptorSet> pDescriptorCopies,
+    //      GaugeComponent component
+    //    ) => ShaderEx.UpdateDescriptorSets(component.FragmentShader, device, pDescriptorWrites);
+    //}
 
     public readonly ref struct MatcherFindReplace(
     CodeMatcher matcher, string name, Span<CodeInstruction> extraArgs = default)

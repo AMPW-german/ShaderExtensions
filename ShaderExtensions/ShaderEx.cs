@@ -8,7 +8,7 @@ using System.Xml.Serialization;
 namespace ShaderExtensions
 {
     [KxAsset("ShaderEx")]
-    [KxAssetInject(typeof(GaugeComponent), nameof(GaugeComponent.FragmentShader), "FragmentEx")]
+    //[KxAssetInject(typeof(GaugeComponent), nameof(GaugeComponent.FragmentShader), "FragmentEx")]
     public class ShaderEx : ShaderReference, IBinder
     {
         [XmlElement("TextureBinding", typeof(TextureBindingReference))]
