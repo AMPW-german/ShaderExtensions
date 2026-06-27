@@ -1,0 +1,73 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "ShaderExtensions/1.0.0": {
+        "dependencies": {
+          "Lib.Harmony": "2.4.2",
+          "ModMenu.Attributes": "1.0.1",
+          "StarMap.API": "0.3.6"
+        },
+        "runtime": {
+          "ShaderExtensions.dll": {}
+        }
+      },
+      "Lib.Harmony/2.4.2": {
+        "runtime": {
+          "lib/net10.0/0Harmony.dll": {
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+      "ModMenu.Attributes/1.0.1": {
+        "runtime": {
+          "lib/netstandard2.0/ModMenu.Attributes.dll": {
+            "assemblyVersion": "1.0.1.0",
+            "fileVersion": "1.0.1.0"
+          }
+        }
+      },
+      "StarMap.API/0.3.6": {
+        "runtime": {
+          "lib/net10.0/StarMap.API.dll": {
+            "assemblyVersion": "0.3.6.0",
+            "fileVersion": "0.3.6.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ShaderExtensions/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Lib.Harmony/2.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-D2X9ojVjqbqdqWVK3VQETrEb56yVoXxtEp6tP5UvW0PP+bA4uJiswqOxF8GhH02ECwyevUa9vwhwdLzyXfksbw==",
+      "path": "lib.harmony/2.4.2",
+      "hashPath": "lib.harmony.2.4.2.nupkg.sha512"
+    },
+    "ModMenu.Attributes/1.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-s0ND4wIZDav1QKDdoXx+AqB90BCn4S+zvLCznkRv/KztiitNw8hNSHzBteYQiSaYGxqFJB7UX26qn0aBwqUX3Q==",
+      "path": "modmenu.attributes/1.0.1",
+      "hashPath": "modmenu.attributes.1.0.1.nupkg.sha512"
+    },
+    "StarMap.API/0.3.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-wYcs0x7Dtxn0xI3I3mXnUFLAxHFfj+iR8nfz8CIIXRXIPjvxxsfsGLmcvxzwmQR/HiPUW5XLyiWm3ga9MFaV2Q==",
+      "path": "starmap.api/0.3.6",
+      "hashPath": "starmap.api.0.3.6.nupkg.sha512"
+    }
+  }
+}

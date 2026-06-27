@@ -12,6 +12,8 @@ namespace ShaderExtensions.PostProcessing.PreImgui
 
         public static unsafe void Rebuild()
         {
+            Program.GetRenderer().Device.WaitIdle();
+
             foreach (var shader in ShaderData) shader.Dispose();
             ShaderData.Clear();
 

@@ -10,6 +10,8 @@ namespace ShaderExtensions.PostProcessing.PostImgui
 {
     public class GlobalPostRenderData : IComparable<GlobalPostRenderData>, IDisposable
     {
+        private bool disposed;
+
         public int SubPassCount { get; private set; }
         public bool UniqueRenderPass { get; private set; }
         public int RenderPassIndex { get; private set; }
@@ -23,18 +25,42 @@ namespace ShaderExtensions.PostProcessing.PostImgui
 
         public void Dispose()
         {
-            Renderer renderer = Program.GetRenderer();
-            renderer.Device.DestroyRenderPass(RenderPass.Pass, null);
-            renderer.Device.DestroyFramebuffer(RenderFramebuffer, null);
-            FramebufferAttachment[] attachments = Attachments;
-            foreach (FramebufferAttachment attachment in attachments)
+            if (disposed)
             {
+                return;
+            }
+
+            disposed = true;
+
+            Renderer renderer = Program.GetRenderer();
+
+            if (PostProcessShaders is not null)
+            {
+                foreach (var shader in PostProcessShaders.Values)
+                {
+                    shader.Dispose();
+                }
+            }
+
+            renderer.Device.DestroyFramebuffer(RenderFramebuffer, null);
+            renderer.Device.DestroyRenderPass(RenderPass.Pass, null);
+
+            if (Attachments is null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < Attachments.Length; i++)
+            {
+                FramebufferAttachment attachment = Attachments[i];
+
+                if (attachment.ImageView.Equals(SourceAttachment.ImageView) || attachment.Image.Equals(SourceAttachment.Image))
+                {
+                    continue;
+                }
+
                 renderer.Device.DestroyImageView(attachment.ImageView, null);
                 attachment.AllocatedImage.Dispose();
-            }
-            foreach (var shader in PostProcessShaders.Values)
-            {
-                shader.Dispose();
             }
         }
 
@@ -158,14 +184,6 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                     Format = renderer.ColorFormat,
                     SubresourceRange = subresourceRange
                 }, null);
-                VkImageViewCreateInfo imageViewCreateInfo = new VkImageViewCreateInfo
-                {
-                    Image = attachment.Image,
-                    ViewType = VkImageViewType._2D,
-                    Format = renderer.ColorFormat,
-                    SubresourceRange = subresourceRange
-                };
-                attachment.ImageView = renderer.Device.CreateImageView(imageViewCreateInfo, null);
 
                 Attachments[0] = attachment;
                 RenderPass = GlobalPostRenderer.CreateSingleRenderPass(renderer);
@@ -220,14 +238,6 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                         Format = renderer.ColorFormat,
                         SubresourceRange = subresourceRange
                     }, null);
-                    VkImageViewCreateInfo imageViewCreateInfo = new VkImageViewCreateInfo
-                    {
-                        Image = attachment.Image,
-                        ViewType = VkImageViewType._2D,
-                        Format = renderer.ColorFormat,
-                        SubresourceRange = subresourceRange
-                    };
-                    attachment.ImageView = renderer.Device.CreateImageView(imageViewCreateInfo, null);
                     Attachments[i] = attachment;
                 }
 

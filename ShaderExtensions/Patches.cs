@@ -184,8 +184,16 @@ namespace ShaderExtensions
                 rebuilt = true;
             }
 
-            if (GlobalPostShaderHandler.offscreenTarget2 == null)
+            bool needsOffscreenTargetRebuild =
+                GlobalPostShaderHandler.offscreenTarget2 == null ||
+                GlobalPostShaderHandler.offscreenTarget2.Extent.Width != renderer.Extent.Width ||
+                GlobalPostShaderHandler.offscreenTarget2.Extent.Height != renderer.Extent.Height;
+
+            if (needsOffscreenTargetRebuild)
             {
+                renderer.Device.WaitIdle();
+
+                GlobalPostShaderHandler.offscreenTarget2?.Dispose();
                 GlobalPostShaderHandler.offscreenTarget2 = new OffscreenTarget(
                     renderer,
                     "ShaderExtensionsImGuiPreRender",
@@ -194,6 +202,9 @@ namespace ShaderExtensions
                     renderer.DepthFormat
                 );
                 GlobalPostShaderHandler.offscreenTarget2.BuildFramebuffer(Program.MainPass.Pass);
+
+                GlobalPostShaderHandler.Rebuild();
+                PostProcessingHandler.Rebuild();
             }
 
             ImGuiRenderers.Render(Program.GetRenderer(), commandBuffer);
