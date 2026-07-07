@@ -1,5 +1,6 @@
 ﻿using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
+using Brutal;
 using Core;
 using KittenExtensions;
 using KSA;
@@ -17,6 +18,9 @@ namespace ShaderExtensions
         [XmlIgnore]
         public List<IShaderBinding> Bindings;
 
+        [XmlIgnore]
+        public List<IShaderPushConstant> PushConstantBindings;
+
         public override void OnDataLoad(Mod mod)
         {
             base.OnDataLoad(mod);
@@ -31,8 +35,68 @@ namespace ShaderExtensions
             // FileReference already implements ILoader and uses an internal virtual method we can't override
             // Bind happens after Load, so all the bindings should be ready here as well
             Bindings = new(XmlBindings.Count);
+            PushConstantBindings = new(XmlBindings.Count);
             foreach (var binding in XmlBindings)
-                Bindings.Add(((IShaderBinding)binding).Get());
+            {
+                if (binding is IShaderBinding shaderBinding)
+                    Bindings.Add(shaderBinding.Get());
+
+                if (binding is IShaderPushConstant pushConstant)
+                    PushConstantBindings.Add(pushConstant.Get());
+            }
+
+            if (PushConstantBindings.Count > 1)
+            {
+                var shaderId = GetShaderId();
+                throw new InvalidOperationException(
+                  $"ShaderEx '{shaderId}' has {PushConstantBindings.Count} push constants registered, but only one push constant is supported per shader instance.");
+            }
+        }
+
+        public VkPushConstantRange[] CreatePushConstantRanges()
+        {
+            if (PushConstantBindings.Count == 0)
+                return [];
+
+            var offset = 0;
+            var ranges = new VkPushConstantRange[PushConstantBindings.Count];
+            for (var i = 0; i < PushConstantBindings.Count; i++)
+            {
+                var pushConstant = PushConstantBindings[i];
+
+                if (pushConstant.SizeBytes <= 0)
+                    throw new InvalidOperationException($"Push constant {pushConstant} has invalid size {pushConstant.SizeBytes}");
+
+                if ((pushConstant.SizeBytes & 3) != 0)
+                    throw new InvalidOperationException($"Push constant {pushConstant} size must be 4-byte aligned");
+
+                offset = (offset + 3) & ~3;
+
+                pushConstant.OffsetBytes = offset;
+                ranges[i] = new VkPushConstantRange
+                {
+                    StageFlags = pushConstant.StageFlags,
+                    Offset = ByteSize.Of(offset),
+                    Size = ByteSize.Of(pushConstant.SizeBytes),
+                };
+
+                offset += pushConstant.SizeBytes;
+            }
+
+            if (offset > MIN_PUSH_CONSTANT_SIZE_BYTES)
+                throw new InvalidOperationException($"Push constant bytes ({offset}) exceed guaranteed Vulkan minimum {MIN_PUSH_CONSTANT_SIZE_BYTES} bytes");
+
+            return ranges;
+        }
+
+        public void PushConstants(CommandBuffer commandBuffer, VkPipelineLayout pipelineLayout)
+        {
+            foreach (var pushConstant in PushConstantBindings)
+                commandBuffer.PushConstants(
+                  pipelineLayout,
+                  pushConstant.StageFlags,
+                  pushConstant.OffsetBytes,
+                  pushConstant.GetData());
         }
 
         public static DescriptorPoolEx CreateDescriptorPool(
@@ -191,6 +255,32 @@ namespace ShaderExtensions
             VkDescriptorType.InputAttachment => WriteType.ImageInfo,
             _ => throw new NotSupportedException($"{type}"),
         };
+
+        private string GetShaderId()
+        {
+            const System.Reflection.BindingFlags flags =
+              System.Reflection.BindingFlags.Instance |
+              System.Reflection.BindingFlags.Public |
+              System.Reflection.BindingFlags.NonPublic;
+
+            var type = GetType();
+            while (type != null)
+            {
+                var idProperty = type.GetProperty("Id", flags) ?? type.GetProperty("ID", flags);
+                if (idProperty?.GetValue(this) is string id && !string.IsNullOrEmpty(id))
+                    return id;
+
+                var idField = type.GetField("Id", flags) ?? type.GetField("ID", flags);
+                if (idField?.GetValue(this) is string fieldId && !string.IsNullOrEmpty(fieldId))
+                    return fieldId;
+
+                type = type.BaseType;
+            }
+
+            return Hash.ToString();
+        }
+
+        private const int MIN_PUSH_CONSTANT_SIZE_BYTES = 128;
     }
 
 }

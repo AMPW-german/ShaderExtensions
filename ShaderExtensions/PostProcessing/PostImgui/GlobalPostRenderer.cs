@@ -14,6 +14,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
         private readonly DescriptorSetLayoutEx bindingLayout;
         private readonly VkDescriptorSet bindingSet;
         private Framebuffer.FramebufferAttachment Source;
+        private readonly ShaderEx shader;
 
         #region renderpasses
         /// <summary>
@@ -198,6 +199,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
           int subPass = 0)
           : base(nameof(GlobalPostRenderer), renderer, finalRenderPass, [shader.VertexShader, shader])
         {
+            this.shader = shader;
             this._subpassIndex = subPass;
 
             this.Source = source;
@@ -246,8 +248,9 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                 ImageInfo = inputInfo,
             });
 
+            var pushConstRanges = shader.CreatePushConstantRanges();
             PipelineLayout = device.CreatePipelineLayout(
-              [GlobalShaderBindings.DescriptorSetLayout, bindingLayout], [], null);
+              [GlobalShaderBindings.DescriptorSetLayout, bindingLayout], pushConstRanges, null);
 
             RebuildFrameResources();
         }
@@ -301,6 +304,8 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                 }]);
             commandBuffer.SetScissor(0, [rect]);
 
+            shader.PushConstants(commandBuffer, PipelineLayout);
+
             int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
             Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
             dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
@@ -332,6 +337,8 @@ namespace ShaderExtensions.PostProcessing.PostImgui
             }]);
             var rect = new VkRect2D(extent);
             commandBuffer.SetScissor(0, [rect]);
+
+            shader.PushConstants(commandBuffer, PipelineLayout);
 
             int bindingCount = Math.Max(1, bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1);
             Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];

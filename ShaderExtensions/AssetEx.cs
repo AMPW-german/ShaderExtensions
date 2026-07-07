@@ -85,6 +85,16 @@ namespace ShaderExtensions
 
                 UniformBufferEx.AddUniformBuffer(type, xmlElement);
             }
+            else if (attr.AttributeType.FullName == typeof(SxPushConstantAttribute).FullName)
+            {
+                if (attr.ConstructorArguments.Count < 1)
+                    return fail("not enough arguments");
+
+                if (!ValidateArg(attr, 0, out string xmlElement, out var err))
+                    return fail(err);
+
+                PushConstantEx.AddPushConstant(type, xmlElement);
+            }
 
             return true;
         }

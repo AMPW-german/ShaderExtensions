@@ -3,6 +3,7 @@ using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
 using Core;
 using KSA;
+using System.Runtime.InteropServices;
 using System.Xml.Serialization;
 
 namespace ShaderExtensions
@@ -22,6 +23,17 @@ namespace ShaderExtensions
         int DescriptorCount { get; }
         IShaderBinding Get();
         void WriteDescriptors(BindingDescriptorWrites write);
+    }
+
+    public interface IShaderPushConstant : ILibraryData, IKeyed
+    {
+        static readonly LookupCollection<IShaderPushConstant> PushConstants = new("shader push constants");
+
+        VkShaderStageFlags StageFlags { get; }
+        int SizeBytes { get; }
+        int OffsetBytes { get; set; }
+        IShaderPushConstant Get();
+        ReadOnlySpan<byte> GetData();
     }
 
     public class TextureBindingReference : TextureReference, IShaderBinding
@@ -106,6 +118,44 @@ namespace ShaderExtensions
                 Range = buffer.BufferSize,
             };
         }
+
+        public override SerializedId Populate() => throw new NotImplementedException();
+        public override TableString.Row ToRow() => new();
+    }
+
+    public class PushConstantBindingReference<T> : SerializedId, IShaderPushConstant
+      where T : unmanaged
+    {
+        public static readonly LookupCollection<PushConstantBindingReference<T>> PushConstants =
+          new($"push constants of {typeof(T)}");
+
+        public static Span<T> GetSpan(KeyHash key) => MemoryMarshal.CreateSpan(ref PushConstants.Get(key).value, 1);
+
+        [XmlAttribute("Stage")]
+        public VkShaderStageFlags Stage = VkShaderStageFlags.FragmentBit;
+
+        private T value;
+
+        public int LookupIndex { get; set; }
+
+        [XmlIgnore]
+        public int OffsetBytes { get; set; }
+
+        public VkShaderStageFlags StageFlags => Stage;
+        public int SizeBytes => (int)ByteSize.Of<T>().Bytes;
+
+        public IShaderPushConstant Get() => this;
+        public override bool IsReference() => false;
+
+        public override void OnDataLoad(Mod mod)
+        {
+            base.OnDataLoad(mod);
+            IShaderPushConstant.PushConstants.Register(this);
+            PushConstants.Register(this);
+        }
+
+        public ReadOnlySpan<byte> GetData() =>
+          MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref value, 1));
 
         public override SerializedId Populate() => throw new NotImplementedException();
         public override TableString.Row ToRow() => new();
