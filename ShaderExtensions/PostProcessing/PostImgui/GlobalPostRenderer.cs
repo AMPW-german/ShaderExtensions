@@ -306,7 +306,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
 
             shader.PushConstants(commandBuffer, PipelineLayout);
 
-            int bindingCount = bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1;
+            int bindingCount = Math.Max(1, bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1);
             Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
             dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
             dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
