@@ -21,4 +21,10 @@ namespace ShaderExtensions
 
     [AttributeUsage(AttributeTargets.Field)]
     internal class SxUniformBufferLookupAttribute() : Attribute;
+
+    [AttributeUsage(AttributeTargets.Struct)]
+    internal class SxPushConstantAttribute(string xmlElement) : Attribute;
+
+    [AttributeUsage(AttributeTargets.Field)]
+    internal class SxPushConstantLookupAttribute() : Attribute;
 }
