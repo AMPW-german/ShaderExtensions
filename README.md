@@ -4,6 +4,7 @@ Post Processing Shaders and uniform buffers for KSA
 
 Current Features:
 - Adds a `<ShaderEx>` asset that allows adding additional texture and uniform buffer bindings to fragment shaders
+- Adds push constants to `ShaderEx` shaders for small per-draw values
 - Adds a `<ImGuiShader>` asset that allows running a custom shader for a specific window
 - Adds `<PostProcessingShader>` and `<GlobalPostShader>` assets to run post processing shaders pre/post imgui
 
@@ -192,6 +193,7 @@ To use uniform buffers, first add the uniform buffer attributes to your assembly
 ```cs
 #pragma warning disable CS9113
 using System;
+using KSA;
 namespace ShaderExtensions
 {
 
@@ -251,5 +253,79 @@ Buffers can be shared between shaders by specifying `Id` without `Size`.
 ```
 
 Note: the elements are aligned with std140 which means padding might be necessary for elements (like vec3 or mat3)
+
+## Push Constants
+
+Push constants can be added to `ShaderEx` shaders for small values that are updated without using a descriptor binding. Each `ShaderEx` instance supports one push constant binding, and its lookup returns a `Span<T>` with length 1. The push constant data must be 4-byte aligned and no larger than the guaranteed Vulkan minimum of 128 bytes.
+
+To use push constants, first add the `SxPushConstantAttribute` and `SxPushConstantLookupAttribute` types to your assembly in the `ShaderExtensions` namespace. The `[SxPushConstant]` attribute must be applied to the push constant struct, and the `[SxPushConstantLookup]` attribute must be applied to a static delegate field on that same struct.
+
+```cs
+#pragma warning disable CS9113
+using System;
+using KSA;
+namespace ShaderExtensions
+{
+  [AttributeUsage(AttributeTargets.Struct)]
+  internal class SxPushConstantAttribute(string xmlElement) : Attribute;
+
+  [AttributeUsage(AttributeTargets.Field)]
+  internal class SxPushConstantLookupAttribute() : Attribute;
+
+  // You can use your own delegate type as long as the signature returns Span<T>
+  public delegate Span<T> SxPushConstantLookup<T>(KeyHash hash) where T : unmanaged;
+}
+```
+
+Then make your custom push constant type. The XML element name comes from the `[SxPushConstant(...)]` attribute. Use a layout compatible with 4-byte alignment and add manual padding when the C# layout would not match the GLSL push constant block.
+
+```cs
+using System.Runtime.InteropServices;
+
+// <MyPushConstant Id="MyPush" />
+[SxPushConstant("MyPushConstant")]
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
+public struct MyPushConstantData
+{
+  public float Intensity;
+  public float Time;
+
+  // lookup delegate fields must be static fields on the push constant type
+  [SxPushConstantLookup] public static SxPushConstantLookup<MyPushConstantData> Lookup;
+}
+```
+
+Add the push constant element to the shader XML. The optional `Stage` attribute defaults to `FragmentBit`.
+
+```xml
+<Assets>
+  <ShaderEx Id="MyFragmentShader" Path="MyShader.frag">
+    <MyPushConstant Id="MyPush" Stage="FragmentBit" />
+  </ShaderEx>
+</Assets>
+```
+
+The data can then be accessed and updated via the lookup function. `Id` is required if you want to update the push constant from code. The framework assigns lookup delegates during asset load, so only call them after the shader assets have loaded.
+
+```cs
+Span<MyPushConstantData> data = MyPushConstantData.Lookup(KeyHash.Make("MyPush"));
+data[0].Intensity = 1.0f;
+data[0].Time = time;
+```
+
+Declare the matching push constant block in the shader.
+
+```glsl
+layout(push_constant) uniform MyPushConstant
+{
+  float Intensity;
+  float Time;
+} Push;
+
+void main()
+{
+  float intensity = Push.Intensity;
+}
+```
 
 [^Sximgui]: The marker key must be the hash of the string `SxImGuiShader`, but this class does not need to exist in this form in order to function, it is just a utility.
