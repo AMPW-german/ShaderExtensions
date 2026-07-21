@@ -203,8 +203,8 @@ namespace ShaderExtensions
                 );
                 GlobalPostShaderHandler.offscreenTarget2.BuildFramebuffer(Program.MainPass.Pass);
 
-                GlobalPostShaderHandler.Rebuild();
                 PostProcessingHandler.Rebuild();
+                GlobalPostShaderHandler.Rebuild();
             }
 
             ImGuiRenderers.Render(Program.GetRenderer(), commandBuffer);
@@ -225,8 +225,8 @@ namespace ShaderExtensions
         internal static void Program_RebuildRenderer_Postfix()
         {
             //ImGuiRenderers.RebuildAll();
-            GlobalPostShaderHandler.Rebuild();
             PostProcessingHandler.Rebuild();
+            GlobalPostShaderHandler.Rebuild();
         }
     }
 

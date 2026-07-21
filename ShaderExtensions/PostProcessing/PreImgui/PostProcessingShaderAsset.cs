@@ -1,5 +1,6 @@
 ﻿using KittenExtensions;
 using KSA;
+using System.Linq;
 using System.Xml.Serialization;
 
 namespace ShaderExtensions.PostProcessing.PreImgui
@@ -27,6 +28,11 @@ namespace ShaderExtensions.PostProcessing.PreImgui
         public override void OnDataLoad(Mod mod)
         {
             base.OnDataLoad(mod);
+            foreach (PostProcessingInputReference input in XmlBindings.OfType<PostProcessingInputReference>())
+                input.Initialize(this);
+            foreach (PostProcessingOutputReference output in XmlBindings.OfType<PostProcessingOutputReference>())
+                output.Initialize(this);
+
             AllShaders.Add(this);
 
             if (!ShadersByPassAndSubpass.TryGetValue(RenderPassId, out SortedDictionary<int, List<PostProcessingShaderAsset>> value1))

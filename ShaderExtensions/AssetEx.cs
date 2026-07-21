@@ -1,5 +1,8 @@
 ﻿using Brutal.Logging;
 using KSA;
+using ShaderExtensions.PostProcessing;
+using ShaderExtensions.PostProcessing.PostImgui;
+using ShaderExtensions.PostProcessing.PreImgui;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
@@ -13,6 +16,11 @@ namespace ShaderExtensions
 
         public static void Init()
         {
+            AddExtension(typeof(PostProcessingShaderAsset), nameof(ShaderEx.XmlBindings), typeof(PostProcessingInputReference), "PostProcessingInputReference");
+            AddExtension(typeof(PostProcessingShaderAsset), nameof(ShaderEx.XmlBindings), typeof(PostProcessingOutputReference), "PostProcessingOutputReference");
+            AddExtension(typeof(GlobalPostShaderAsset), nameof(ShaderEx.XmlBindings), typeof(PostProcessingInputReference), "PostProcessingInputReference");
+            AddExtension(typeof(GlobalPostShaderAsset), nameof(ShaderEx.XmlBindings), typeof(PostProcessingOutputReference), "PostProcessingOutputReference");
+
             foreach (var alc in AssemblyLoadContext.All)
                 foreach (var asm in alc.Assemblies)
                     if (asm.GetType(typeof(SxUniformBufferAttribute).FullName) != null)
@@ -136,35 +144,47 @@ namespace ShaderExtensions
             foreach (var group in injections.GroupBy(inj => inj.Member))
             {
                 var member = group.Key;
+                var overrideType = member.DeclaringType ?? type;
                 var attrs = new XmlAttributes();
                 foreach (var attr in member.GetCustomAttributes())
                 {
                     if (attr is XmlElementAttribute elAttr)
-                        attrs.XmlElements.Add(elAttr);
+                        AddXmlElement(attrs, elAttr);
                 }
                 foreach (var inj in group)
-                    attrs.XmlElements.Add(new(inj.XmlElement, inj.ChildType));
+                    AddXmlElement(attrs, new(inj.XmlElement, inj.ChildType));
 
                 try
                 {
-                    overrides.Add(type, member.Name, attrs);
+                    overrides.Add(overrideType, member.Name, attrs);
                 }
                 catch
                 {
-                    XmlAttributes attrs2 = overrides[type, member.Name];
+                    XmlAttributes attrs2 = overrides[overrideType, member.Name];
                     foreach (var attr in member.GetCustomAttributes())
                     {
-                        if (attr is XmlElementAttribute elAttr && !attrs2.XmlElements.Contains(elAttr))
-                            attrs2.XmlElements.Add(elAttr);
+                        if (attr is XmlElementAttribute elAttr)
+                            AddXmlElement(attrs2, elAttr);
                     }
                     foreach (var inj in group)
-                        attrs2.XmlElements.Add(new(inj.XmlElement, inj.ChildType));
+                        AddXmlElement(attrs2, new(inj.XmlElement, inj.ChildType));
 
 
                     //var typesField = overrides.GetType().GetField("_types", BindingFlags.NonPublic | BindingFlags.Instance);
-                    //overrides[type, member.Name]
+                    //overrides[overrideType, member.Name]
                 }
             }
+        }
+
+        private static void AddXmlElement(XmlAttributes attrs, XmlElementAttribute element)
+        {
+            foreach (XmlElementAttribute existing in attrs.XmlElements)
+            {
+                if (existing.ElementName == element.ElementName && existing.Type == element.Type)
+                    return;
+            }
+
+            attrs.XmlElements.Add(element);
         }
 
         public bool Add(string memberName, Type childType, string xmlElement)

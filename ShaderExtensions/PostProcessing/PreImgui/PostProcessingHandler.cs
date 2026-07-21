@@ -16,6 +16,7 @@ namespace ShaderExtensions.PostProcessing.PreImgui
 
             foreach (var shader in ShaderData) shader.Dispose();
             ShaderData.Clear();
+            PostProcessingInputResolver.Clear(preImgui: true);
 
             OffscreenTarget offscreenTarget = typeof(Program).GetField("_offscreenTarget", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(Program.Instance) as OffscreenTarget;
 

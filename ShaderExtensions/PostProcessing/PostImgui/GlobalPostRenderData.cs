@@ -21,6 +21,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
         public FramebufferAttachment TargetAttachment => Attachments.LastOrDefault();
         public VkFramebuffer RenderFramebuffer { get; private set; }
         public SortedDictionary<int, GlobalPostRenderer> PostProcessShaders { get; private set; }
+        private List<FramebufferAttachment> SampledReferenceAttachments { get; } = [];
         public string Name { get; private set; }
 
         public void Dispose()
@@ -70,27 +71,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
             Renderer renderer = Program.GetRenderer();
             VkExtent2D extent = renderer.Extent;
 
-            commandBuffer.PipelineBarrier(
-                srcStageMask: VkPipelineStageFlags.ColorAttachmentOutputBit,
-                dstStageMask: VkPipelineStageFlags.ColorAttachmentOutputBit,
-                dependencyFlags: VkDependencyFlags.None,
-                pMemoryBarriers: ReadOnlySpan<VkMemoryBarrier>.Empty,
-                pBufferMemoryBarriers: ReadOnlySpan<VkBufferMemoryBarrier>.Empty,
-                pImageMemoryBarriers: new VkImageMemoryBarrier[]
-                {
-                        new VkImageMemoryBarrier
-                        {
-                            SrcAccessMask = VkAccessFlags.ColorAttachmentWriteBit,
-                            DstAccessMask = VkAccessFlags.ShaderReadBit,
-                            OldLayout = VkImageLayout.ColorAttachmentOptimal,
-                            NewLayout = VkImageLayout.ShaderReadOnlyOptimal,
-                            SrcQueueFamilyIndex = VK.QUEUE_FAMILY_IGNORED,
-                            DstQueueFamilyIndex = VK.QUEUE_FAMILY_IGNORED,
-                            Image = SourceAttachment.Image,
-                            SubresourceRange = SourceAttachment.SubresourceRange
-                        }
-                }
-            );
+            TransitionSampledReferenceAttachments(commandBuffer);
 
             if (UniqueRenderPass)
             {
@@ -98,6 +79,28 @@ namespace ShaderExtensions.PostProcessing.PostImgui
             }
             else
             {
+                commandBuffer.PipelineBarrier(
+                    srcStageMask: VkPipelineStageFlags.ColorAttachmentOutputBit,
+                    dstStageMask: VkPipelineStageFlags.FragmentShaderBit,
+                    dependencyFlags: VkDependencyFlags.None,
+                    pMemoryBarriers: ReadOnlySpan<VkMemoryBarrier>.Empty,
+                    pBufferMemoryBarriers: ReadOnlySpan<VkBufferMemoryBarrier>.Empty,
+                    pImageMemoryBarriers: new VkImageMemoryBarrier[]
+                    {
+                            new VkImageMemoryBarrier
+                            {
+                                SrcAccessMask = VkAccessFlags.ColorAttachmentWriteBit,
+                                DstAccessMask = VkAccessFlags.ShaderReadBit,
+                                OldLayout = VkImageLayout.ColorAttachmentOptimal,
+                                NewLayout = VkImageLayout.ShaderReadOnlyOptimal,
+                                SrcQueueFamilyIndex = VK.QUEUE_FAMILY_IGNORED,
+                                DstQueueFamilyIndex = VK.QUEUE_FAMILY_IGNORED,
+                                Image = SourceAttachment.Image,
+                                SubresourceRange = SourceAttachment.SubresourceRange
+                            }
+                    }
+                );
+
                 commandBuffer.BeginRenderPass(new VkRenderPassBeginInfo
                 {
                     RenderPass = RenderPass.Pass,
@@ -203,7 +206,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
 
                 PostProcessShaders = new SortedDictionary<int, GlobalPostRenderer> {
                     {
-                        0, new GlobalPostRenderer(renderer, source, RenderPass, shaders[0], uniqueRenderpass: true)
+                        0, CreateGlobalPostRenderer(renderer, source, RenderPass, shaders[0], Attachments[0], SampledReferenceAttachments, uniqueRenderpass: true)
                     }
                 };
             }
@@ -263,10 +266,69 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                 {
                     GlobalPostShaderAsset shader = shaders[i];
                     FramebufferAttachment input = Attachments[i];
-                    GlobalPostRenderer finalPostRenderer = new GlobalPostRenderer(renderer, input, RenderPass, shader, subPass: i);
+                    FramebufferAttachment output = Attachments[i + 1];
+                    GlobalPostRenderer finalPostRenderer = CreateGlobalPostRenderer(renderer, input, RenderPass, shader, output, SampledReferenceAttachments, subPass: i);
                     PostProcessShaders.Add(i, finalPostRenderer);
                 }
             }
+        }
+
+        private static GlobalPostRenderer CreateGlobalPostRenderer(
+            Renderer renderer,
+            FramebufferAttachment input,
+            RenderPassState renderPass,
+            GlobalPostShaderAsset shader,
+            FramebufferAttachment output,
+            List<FramebufferAttachment> sampledReferenceAttachments,
+            bool uniqueRenderpass = false,
+            int subPass = 0)
+        {
+            PostProcessingInputResolver.RegisterInput(preImgui: false, shader.RenderPassId, shader.SubpassId, input);
+            PostProcessingInputResolver.Resolve(shader);
+            AddSampledReferenceAttachments(shader, sampledReferenceAttachments);
+            GlobalPostRenderer globalPostRenderer = new(renderer, input, renderPass, shader, uniqueRenderpass, subPass);
+            PostProcessingInputResolver.RegisterOutput(preImgui: false, shader.RenderPassId, shader.SubpassId, output);
+            return globalPostRenderer;
+        }
+
+        private static void AddSampledReferenceAttachments(GlobalPostShaderAsset shader, List<FramebufferAttachment> sampledReferenceAttachments)
+        {
+            foreach (PostProcessingInputReference input in shader.XmlBindings.OfType<PostProcessingInputReference>())
+                AddUnique(sampledReferenceAttachments, input.Attachment);
+            foreach (PostProcessingOutputReference output in shader.XmlBindings.OfType<PostProcessingOutputReference>())
+                AddUnique(sampledReferenceAttachments, output.Attachment);
+        }
+
+        private static void AddUnique(List<FramebufferAttachment> attachments, FramebufferAttachment attachment)
+        {
+            if (!attachments.Any(existing => existing.Image.Equals(attachment.Image)))
+                attachments.Add(attachment);
+        }
+
+        private void TransitionSampledReferenceAttachments(CommandBuffer commandBuffer)
+        {
+            FramebufferAttachment[] attachments = SampledReferenceAttachments
+                .Where(attachment => !IsCurrentRenderPassAttachment(attachment))
+                .ToArray();
+
+            if (attachments.Length == 0)
+                return;
+
+            KSA.Rendering.ImageTransition[] transitions = new KSA.Rendering.ImageTransition[attachments.Length];
+            for (int i = 0; i < attachments.Length; i++)
+            {
+                transitions[i] = new KSA.Rendering.ImageTransition(
+                    inImage: attachments[i].Image,
+                    inSrc: KSA.Rendering.ImageBarrierInfo.Presets.ColorAttachmentWrite,
+                    inDst: KSA.Rendering.ImageBarrierInfo.Presets.SampledReadFragment);
+            }
+
+            commandBuffer.TransitionImages2(transitions);
+        }
+
+        private bool IsCurrentRenderPassAttachment(FramebufferAttachment attachment)
+        {
+            return Attachments.Any(existing => existing.Image.Equals(attachment.Image));
         }
     }
 }

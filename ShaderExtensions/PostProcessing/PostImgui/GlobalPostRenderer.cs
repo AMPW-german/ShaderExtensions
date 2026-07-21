@@ -146,7 +146,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
             colorAttachment.StencilStoreOp = VkAttachmentStoreOp.Store;
 
             colorAttachment.InitialLayout = VkImageLayout.ColorAttachmentOptimal;
-            colorAttachment.FinalLayout = VkImageLayout.PresentSrcKHR;
+            colorAttachment.FinalLayout = VkImageLayout.ColorAttachmentOptimal;
 
             VkAttachmentReference colorRef = new VkAttachmentReference();
             colorRef.Attachment = 0;

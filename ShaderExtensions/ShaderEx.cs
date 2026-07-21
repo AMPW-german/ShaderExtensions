@@ -35,7 +35,7 @@ namespace ShaderExtensions
             // FileReference already implements ILoader and uses an internal virtual method we can't override
             // Bind happens after Load, so all the bindings should be ready here as well
             Bindings = new(XmlBindings.Count);
-            PushConstantBindings = new(XmlBindings.Count);
+            PushConstantBindings = new();
             foreach (var binding in XmlBindings)
             {
                 if (binding is IShaderBinding shaderBinding)
