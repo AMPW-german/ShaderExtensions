@@ -1,0 +1,448 @@
+name: ShaderExtensions CI
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-package:
+    runs-on: ubuntu-slim
+    outputs:
+      versionprefix_changed: ${{ steps.versionprefix.outputs.changed }}
+      version: ${{ steps.versionprefix.outputs.version }}
+      ksa_version: ${{ steps.ksa-version.outputs.version }}
+      artifact_name: ${{ steps.artifact-name.outputs.name }}
+      release_needed: ${{ steps.release-check.outputs.release_needed }}
+    env:
+      CONFIGURATION: ${{ github.event_name == 'pull_request' && 'Debug' || 'Release' }}
+      KSA_DLL_REPOSITORY: ${{ secrets.KSADLLRepo }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Prepare dependency folders
+        shell: bash
+        run: |
+          mkdir -p deps deps/extracted deps/ksa
+
+      - name: Download latest dependency DLLs from GitHub releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_OWNER: ${{ github.repository_owner }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+          import zipfile
+
+          owner = os.environ["GH_OWNER"]
+          token = os.environ["GH_TOKEN"]
+          deps_dir = pathlib.Path("deps")
+          extracted_dir = deps_dir / "extracted"
+          extracted_dir.mkdir(parents=True, exist_ok=True)
+
+          def api_get(url: str) -> dict:
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2026-03-10",
+                  },
+              )
+              with urllib.request.urlopen(req) as response:
+                  return json.loads(response.read().decode("utf-8"))
+
+          def download(url: str, target: pathlib.Path):
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/octet-stream",
+                      "X-GitHub-Api-Version": "2026-03-10",
+                  },
+              )
+              with urllib.request.urlopen(req) as response:
+                  target.write_bytes(response.read())
+
+          def latest_release(repo: str, repoPath: str) -> dict:
+              return api_get(f"https://api.github.com/repos/{repoPath}/{repo}/releases/latest")
+
+          def find_asset(assets: list, predicate, error: str) -> dict:
+              for asset in assets:
+                  if predicate(asset):
+                      return asset
+              raise RuntimeError(error)
+
+          def download_zip_published_dll(repo: str, repoPath: str, dll_name: str):
+              release = latest_release(repo, repoPath)
+              assets = release.get("assets", [])
+              zip_asset = find_asset(
+                  assets,
+                  lambda a: a["name"].lower().endswith(".zip"),
+                  f"No zip asset found in latest release for {repo}.",
+              )
+
+              zip_path = deps_dir / f"{repo}-latest.zip"
+              extract_path = extracted_dir / repo
+              extract_path.mkdir(parents=True, exist_ok=True)
+              download(zip_asset["browser_download_url"], zip_path)
+
+              with zipfile.ZipFile(zip_path, "r") as archive:
+                  archive.extractall(extract_path)
+
+              dll_matches = list(extract_path.rglob(dll_name))
+              if not dll_matches:
+                  raise RuntimeError(f"{dll_name} not found in latest {repo} zip release asset.")
+
+              target = deps_dir / dll_name
+              target.write_bytes(dll_matches[0].read_bytes())
+
+          def download_zip_published_dll_path(repo: str, repoPath: str, dll_name: str, dll_path: str, pdb: bool):
+              release = latest_release(repo, repoPath)
+              assets = release.get("assets", [])
+              zip_asset = find_asset(
+                  assets,
+                  lambda a: a["name"].lower().endswith(".zip"),
+                  f"No zip asset found in latest release for {repo}.",
+              )
+
+              zip_path = deps_dir / f"{repo}-latest.zip"
+              extract_path = extracted_dir / repo
+              extract_path.mkdir(parents=True, exist_ok=True)
+              download(zip_asset["browser_download_url"], zip_path)
+
+              with zipfile.ZipFile(zip_path, "r") as archive:
+                  archive.extractall(extract_path)
+
+              full_path = extract_path / dll_path / dll_name
+
+              if not full_path.exists():
+                  raise RuntimeError(f"{dll_name} not found at {dll_path} in latest {repo} zip release asset.")
+
+              target = deps_dir / dll_name
+              target.write_bytes(full_path.read_bytes())
+
+              if pdb:
+                  pdb_name = dll_name.replace(".dll", ".pdb")
+                  full_pdb_path = extract_path / dll_path / pdb_name
+                  if not full_pdb_path.exists():
+                      raise RuntimeError(f"{pdb_name} not found at {dll_path} in latest {repo} zip release asset.")
+                  target_pdb = deps_dir / pdb_name
+                  target_pdb.write_bytes(full_pdb_path.read_bytes())
+
+          def download_direct_dll(repo: str, repoPath: str, dll_name: str):
+              release = latest_release(repo, repoPath)
+              assets = release.get("assets", [])
+              dll_asset = find_asset(
+                  assets,
+                  lambda a: a["name"].lower() == dll_name.lower(),
+                  f"No direct DLL asset named {dll_name} found in latest release for {repo}.",
+              )
+              download(dll_asset["browser_download_url"], deps_dir / dll_name)
+
+          download_zip_published_dll("KittenExtensions", "tsholmes", "KittenExtensions.dll")
+
+      - name: Validate private KSA DLL repository setting
+        if: ${{ env.KSA_DLL_REPOSITORY == '' }}
+        shell: bash
+        run: |
+          echo "Missing repository variable KSA_DLL_REPOSITORY (expected format: owner/repo)." >&2
+          exit 1
+
+      - name: Parse private KSA DLL repository
+        id: ksa-repo
+        shell: bash
+        run: |
+          owner="${KSA_DLL_REPOSITORY%%/*}"
+          repo="${KSA_DLL_REPOSITORY##*/}"
+          if [ -z "$owner" ] || [ -z "$repo" ] || [ "$owner" = "$repo" ]; then
+            echo "Invalid KSADLLRepo secret value: ${KSA_DLL_REPOSITORY}. Expected owner/repo." >&2
+            exit 1
+          fi
+          echo "owner=$owner" >> "$GITHUB_OUTPUT"
+          echo "repo=$repo" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub App token for KSA DLL repo
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ steps.ksa-repo.outputs.owner }}
+          repositories: ${{ steps.ksa-repo.outputs.repo }}
+
+      - name: Download private KSA DLLs from repository
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${KSA_DLL_REPOSITORY}.git" deps/ksa-repo
+          find deps/ksa-repo -maxdepth 1 -type f -exec cp {} deps/ksa/ \;
+          dll_count=$(find deps/ksa -maxdepth 1 -type f -name '*.dll' | wc -l)
+          if [ "$dll_count" -eq 0 ]; then
+            echo "No DLL files found in root of ${KSA_DLL_REPOSITORY}." >&2
+            exit 1
+          fi
+
+      - name: Collect KSA version
+        id: ksa-version
+        shell: bash
+        run: |
+          ksa_version_txt="deps/ksa/KSA_VERSION.txt"
+          if [ ! -f "$ksa_version_txt" ]; then
+            echo "KSA_VERSION.txt not found in deps/ksa. Cannot determine KSA version." >&2
+            exit 1
+          fi
+          echo "version=$(cat "$ksa_version_txt")" >> "$GITHUB_OUTPUT"
+
+      - name: Switch project references to CI DLL hint paths
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+
+          project_path = pathlib.Path("ShaderExtensions/ShaderExtensions.csproj")
+          content = project_path.read_text(encoding="utf-8")
+
+          content = content.replace(
+              r"..\..\..\..\Documents\My Games\Kitten Space Agency\mods\KittenExtensions\KittenExtensions.dll",
+              "../deps/KittenExtensions.dll",
+          )
+
+          project_path.write_text(content, encoding="utf-8")
+          PY
+
+      - name: Detect VersionPrefix change on main push
+        id: versionprefix
+        shell: bash
+        run: |
+          version=v$(grep -oPm1 '(?<=<VersionPrefix>)[^<]+' ShaderExtensions/ShaderExtensions.csproj)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff "$before" "${{ github.sha }}" -- ShaderExtensions/ShaderExtensions.csproj | grep -q 'VersionPrefix'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if current version needs release
+        id: release-check
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          new_version="${{ steps.versionprefix.outputs.version }}"
+          release_response=$(curl -sS -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+
+          current_version=$(echo "$release_response" | jq -r '.tag_name // empty')
+
+          if [ -z "$current_version" ]; then
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+          elif [ "$new_version" != "$current_version" ]; then
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore ShaderExtensions/ShaderExtensions.csproj
+
+      - name: Build ShaderExtensions
+        shell: bash
+        run: |
+          rm -rf Release/ShaderExtensions
+          mkdir -p Release/ShaderExtensions
+
+          ksa_dir="$(pwd)/deps/ksa/"
+          dotnet build ShaderExtensions/ShaderExtensions.csproj -c "$CONFIGURATION" --no-restore /p:KSADir="$ksa_dir" /p:OutputPath="../Release/ShaderExtensions/"
+
+      - name: Compute artifact name
+        id: artifact-name
+        shell: bash
+        run: |
+          version="${{ steps.versionprefix.outputs.version }}"
+          short_hash="${GITHUB_SHA::7}"
+
+          if [ "$CONFIGURATION" = "Debug" ]; then
+            artifact_name="ShaderExtensions-${version}-${short_hash}-debug"
+          elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ] && [ "${{ steps.versionprefix.outputs.changed }}" = "true" ]; then
+            artifact_name="ShaderExtensions-${version}"
+          else
+            artifact_name="ShaderExtensions-${version}-${short_hash}"
+          fi
+
+          echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: Release/ShaderExtensions/
+
+  release:
+    runs-on: ubuntu-slim
+    needs: build-package
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build-package.outputs.release_needed == 'true' }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-package.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Zip release payload
+        shell: bash
+        run: |
+          artifact_name="${{ needs.build-package.outputs.artifact_name }}"
+          cd release-assets
+          zip -r "../${artifact_name}.zip" .
+
+      - name: Create GitHub release
+        id: github-release
+        shell: bash
+        run: |
+          json_payload=$(jq -n \
+            --arg tag_name "${{ needs.build-package.outputs.version }}" \
+            --arg name "${{ needs.build-package.outputs.version }}" \
+            --arg body "Built for KSA version ${{ needs.build-package.outputs.ksa_version }}" \
+            '{ tag_name: $tag_name, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: true }')
+
+          echo "Creating release with payload: $json_payload"
+          response_file=$(mktemp)
+          http_status=$(curl -sS -L -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            https://api.github.com/repos/${{ github.repository }}/releases \
+            -d "$json_payload" \
+            -o "$response_file" \
+            -w "%{http_code}")
+
+          if [ "$http_status" -ne 201 ]; then
+            echo "Failed to create release. Expected HTTP 201, got HTTP $http_status." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+          upload_url=$(jq -r '.upload_url' "$response_file")
+          if [ -z "$upload_url" ] || [ "$upload_url" = "null" ]; then
+            echo "Release created but upload_url is missing in response." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+          upload_url="${upload_url%\{*}"
+          asset_name="${{ needs.build-package.outputs.artifact_name }}.zip"
+          asset_path="$asset_name"
+
+          if [ ! -f "$asset_path" ]; then
+            echo "Expected release asset file '$asset_path' was not found." >&2
+            exit 1
+          fi
+
+          echo "Uploading release asset: $asset_name"
+          upload_response_file=$(mktemp)
+          upload_status=$(curl -sS -L -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/zip" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            --data-binary @"$asset_path" \
+            "${upload_url}?name=${asset_name}" \
+            -o "$upload_response_file" \
+            -w "%{http_code}")
+
+          if [ "$upload_status" -ne 201 ]; then
+            echo "Failed to upload release asset. Expected HTTP 201, got HTTP $upload_status." >&2
+            cat "$upload_response_file" >&2
+            exit 1
+          fi
+
+          release_id=$(jq -r '.id' "$response_file")
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "Release created but id is missing in response." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+          publish_payload='{"draft":false}'
+          publish_response_file=$(mktemp)
+          publish_status=$(curl -sS -L -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            https://api.github.com/repos/${{ github.repository }}/releases/$release_id \
+            -d "$publish_payload" \
+            -o "$publish_response_file" \
+            -w "%{http_code}")
+
+          if [ "$publish_status" -ne 200 ]; then
+            echo "Failed to publish release. Expected HTTP 200, got HTTP $publish_status." >&2
+            cat "$publish_response_file" >&2
+            exit 1
+          fi
+
+          release_changelog=$(jq -r '.body // ""' "$publish_response_file")
+          {
+            echo "changelog<<EOF"
+            echo "$release_changelog"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Release created and asset uploaded successfully."
+
+      - name: Create SpaceDock release
+        shell: bash
+        env:
+          SPACEDOCK_USERNAME: ${{ vars.SPACEDOCKUSERNAME }}
+          SPACEDOCK_PASSWORD: ${{ secrets.SPACEDOCKAUTH }}
+          RELEASE_VERSION: ${{ needs.build-package.outputs.version }}
+          RELEASE_CHANGELOG: ${{ steps.github-release.outputs.changelog }}
+          KSA_VERSION: ${{ needs.build-package.outputs.ksa_version }}
+          ZIPBALL: ${{ needs.build-package.outputs.artifact_name }}.zip
+        run: |
+          printf '%s' "$RELEASE_CHANGELOG" > spacedock-changelog.md
+
+          curl --form-string "username=$SPACEDOCK_USERNAME" \
+               --form-string "password=$SPACEDOCK_PASSWORD" \
+               -c ./cookies \
+               https://spacedock.info/api/login
+
+          curl -b ./cookies \
+               --form-string "version=$RELEASE_VERSION" \
+               -F "changelog=<spacedock-changelog.md" \
+               --form-string "game-version=$KSA_VERSION" \
+               --form-string "notify-followers=yes" \
+               -F "zipball=@$ZIPBALL" \
+               https://spacedock.info/api/mod/4164/update

@@ -17,6 +17,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
 
             foreach (var shader in ShaderData) shader.Dispose();
             ShaderData.Clear();
+            PostProcessingInputResolver.Clear(preImgui: false);
 
             FramebufferAttachment source = offscreenTarget2.ColorImage;
 

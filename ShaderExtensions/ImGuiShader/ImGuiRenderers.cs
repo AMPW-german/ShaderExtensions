@@ -90,7 +90,7 @@ namespace ShaderExtensions.ImGuiShader
                 transitions[i] = new(
                   activeRenderers[i].Target,
                   ImageBarrierInfo.Presets.ColorAttachmentWrite,
-                  ImageBarrierInfo.Presets.SampledReadVertex);
+                  ImageBarrierInfo.Presets.SampledReadFragment);
 
             commandBuffer.TransitionImages2(transitions);
         }

@@ -1,0 +1,33 @@
+<Project>
+    <PropertyGroup>
+        <IsLocalBuild Condition="'$(GITHUB_ACTIONS)' != 'true'">true</IsLocalBuild>
+        <PublishSourceDir>$(TargetDir)</PublishSourceDir>
+    </PropertyGroup>
+
+    <!--<ItemGroup Condition="'$(IsLocalBuild)' == 'true' and '$(OS)' == 'Windows_NT'">-->
+    <ItemGroup>
+        <CopyDestination Include="$(SolutionDir)Release\$(ModName)\" />
+    </ItemGroup>
+
+    <Target Name="CopyBuildOutput" AfterTargets="Build" Condition="'$(IsLocalBuild)' == 'true' and '$(OS)' == 'Windows_NT'">
+        <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CopyToSingleDestination" Properties="SingleCopyDestination=%(CopyDestination.Identity)" />
+    </Target>
+
+    <Target Name="_CopyToSingleDestination">
+        <Message Text="Refreshing $(SingleCopyDestination)" Importance="high" />
+
+        <!-- Collect files here -->
+        <ItemGroup>
+            <FilesToCopy Include="$(OutputPath)**\*" />
+        </ItemGroup>
+
+        <!-- Remove existing directory -->
+        <RemoveDir Directories="$(SingleCopyDestination)" />
+
+        <!-- Recreate -->
+        <MakeDir Directories="$(SingleCopyDestination)" />
+
+        <!-- Copy preserving structure -->
+        <Copy SourceFiles="@(FilesToCopy)" DestinationFiles="@(FilesToCopy->'$(SingleCopyDestination)%(RecursiveDir)%(Filename)%(Extension)')" />
+    </Target>
+</Project>

@@ -11,31 +11,43 @@
 		<OutputPath>bin\$(Configuration)</OutputPath>
 		<AssemblyName>$(ModName)</AssemblyName>
 		<OutputType>Library</OutputType>
-		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Configurations>Debug;Release</Configurations>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+
+		<VersionPrefix>0.4.0</VersionPrefix>
+		<Version>$(VersionPrefix)</Version>
+		<AssemblyVersion>0.4.0.0</AssemblyVersion>
+		<FileVersion>$(VersionPrefix).0</FileVersion>
+
+		<GitShortHash>nogit</GitShortHash>
+		<InformationalVersionPostfix></InformationalVersionPostfix>
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+		<Company>AMPW</Company>
+		<Authors>AMPW</Authors>
+		<Copyright>GNU GPL v3.0</Copyright>
 	</PropertyGroup>
-	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+
+	<PropertyGroup>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
-		<Optimize>false</Optimize>
-		<DefineConstants>DEBUG;TRACE</DefineConstants>
-		<ErrorReport>prompt</ErrorReport>
-		<WarningLevel>4</WarningLevel>
-		<Prefer32Bit>false</Prefer32Bit>
-	</PropertyGroup>
-	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-		<DebugType>pdbonly</DebugType>
-		<Optimize>true</Optimize>
-		<DefineConstants>TRACE</DefineConstants>
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>4</WarningLevel>
 		<Prefer32Bit>false</Prefer32Bit>
 	</PropertyGroup>
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+		<InformationalVersionPostfix>-debug</InformationalVersionPostfix>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<Optimize>false</Optimize>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<Optimize>true</Optimize>
+		<DefineConstants>TRACE</DefineConstants>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
@@ -44,30 +56,30 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Reference Include="KittenExtensions">
-	    <HintPath>..\..\..\..\Documents\My Games\Kitten Space Agency\mods\KittenExtensions\KittenExtensions.dll</HintPath>
-	    <Private>False</Private>
-	  </Reference>
+		<Reference Include="KittenExtensions">
+			<HintPath>..\..\..\..\Documents\My Games\Kitten Space Agency\mods\KittenExtensions\KittenExtensions.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
 	</ItemGroup>
 
-  <ItemGroup>
-    <None Update="mod.toml">
+	<ItemGroup>
+		<None Update="mod.toml">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
-  </ItemGroup>
+	</ItemGroup>
 
+	<Target Name="SetVersionMetadata" BeforeTargets="GetAssemblyVersion">
+		<Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true">
+			<Output TaskParameter="ConsoleOutput" PropertyName="GitShortHashRaw" />
+		</Exec>
 
-	<Target Name="CopyOutputToExternalFolder" AfterTargets="Build">
 		<PropertyGroup>
-			<ExternalFolder>$(SolutionDir)Content\MPFX\</ExternalFolder>
+			<GitShortHash Condition="'$(GitShortHashRaw)' != ''">$([System.String]::Copy('$(GitShortHashRaw)').Trim())</GitShortHash>
+			<GitShortHash Condition="'$(GitShortHash)' == ''">nogit</GitShortHash>
+			<InformationalVersion>v$(VersionPrefix).$(GitShortHash)$(InformationalVersionPostfix)</InformationalVersion>
+			<ProductVersion>$(InformationalVersion)</ProductVersion>
 		</PropertyGroup>
-
-		<!-- Capture all files WITH folder structure -->
-		<ItemGroup>
-			<FilesToCopy Include="$(OutputPath)**\*" />
-		</ItemGroup>
-
-		<!-- Copy while preserving subfolders -->
-		<Copy SourceFiles="@(FilesToCopy)" DestinationFiles="@(FilesToCopy->'$(ExternalFolder)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" OverwriteReadOnlyFiles="true" />
 	</Target>
+
+	<Import Project="CopyOutput.targets" />
 </Project>

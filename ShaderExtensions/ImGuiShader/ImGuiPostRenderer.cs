@@ -21,6 +21,8 @@ namespace ShaderExtensions.ImGuiShader
 
         private readonly DescriptorSetLayoutEx bindingLayout;
         private readonly VkDescriptorSet bindingSet;
+        private readonly int dynamicOffsetCount;
+        private readonly ShaderEx shader;
 
         public ImTextureRef ImGuiTexture { get; private set; }
         public Framebuffer.FramebufferAttachment Target => renderTarget.ColorImage;
@@ -28,6 +30,7 @@ namespace ShaderExtensions.ImGuiShader
         public unsafe ImGuiPostRenderer(Renderer renderer, VkExtent2D extent, ShaderReference vert, ShaderEx frag)
           : base(nameof(ImGuiPostRenderer), renderer, Program.MainPass, [vert, frag])
         {
+            shader = frag;
             BaseRenderer = new(renderer, extent);
             renderTarget = new(renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
             renderPass = renderTarget.CreateRenderPass();
@@ -64,15 +67,21 @@ namespace ShaderExtensions.ImGuiShader
                 DstSet = bindingSet,
                 ImageInfo = inputInfo,
             });
+            foreach (var binding in frag.Bindings)
+                if (binding.DescriptorType == VkDescriptorType.UniformBufferDynamic)
+                    dynamicOffsetCount += binding.DescriptorCount;
 
-            var pushConst = new VkPushConstantRange()
+            var shaderPushConstRanges = frag.CreatePushConstantRanges();
+            var pushConstRanges = new VkPushConstantRange[shaderPushConstRanges.Length + 1];
+            pushConstRanges[0] = new VkPushConstantRange()
             {
                 StageFlags = VkShaderStageFlags.VertexBit,
                 Offset = ByteSize.Zero,
                 Size = ByteSize.Of<float>(8),
             };
+            shaderPushConstRanges.CopyTo(pushConstRanges.AsSpan(1));
 
-            PipelineLayout = device.CreatePipelineLayout([bindingLayout], [pushConst], null);
+            PipelineLayout = device.CreatePipelineLayout([bindingLayout], pushConstRanges, null);
 
             RebuildFrameResources();
         }
@@ -133,7 +142,7 @@ namespace ShaderExtensions.ImGuiShader
               new ImageTransition(
             BaseRenderer.Target,
             ImageBarrierInfo.Presets.ColorAttachmentWrite,
-            ImageBarrierInfo.Presets.SampledReadVertex
+            ImageBarrierInfo.Presets.SampledReadFragment
           )]);
 
             var extent = new VkExtent2D(renderTarget.Extent.Width, renderTarget.Extent.Height);
@@ -160,8 +169,11 @@ namespace ShaderExtensions.ImGuiShader
             commandBuffer.PushConstants(
               PipelineLayout, VkShaderStageFlags.VertexBit, 0,
               MemoryMarshal.Cast<float4, byte>(pushConsts));
+            shader.PushConstants(commandBuffer, PipelineLayout);
 
-            commandBuffer.BindDescriptorSets(VkPipelineBindPoint.Graphics, PipelineLayout, 0, [bindingSet], []);
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[dynamicOffsetCount];
+            dynamicOffsets.Clear();
+            commandBuffer.BindDescriptorSets(VkPipelineBindPoint.Graphics, PipelineLayout, 0, [bindingSet], dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
 
