@@ -28,7 +28,7 @@
 
 		<Company>AMPW</Company>
 		<Authors>AMPW</Authors>
-		<Copyright>GNU GPL v3.0</Copyright>
+		<Copyright>MIT</Copyright>
 	</PropertyGroup>
 
 	<PropertyGroup>
