@@ -232,8 +232,8 @@ jobs:
         id: versionprefix
         shell: bash
         run: |
-          version=v$(grep -oPm1 '(?<=<VersionPrefix>)[^<]+' MPFX/MPFX.csproj)
-          echo "MPFX version: $version"
+          version=v$(grep -oPm1 '(?<=<VersionPrefix>)[^<]+' ShaderExtensions/ShaderExtensions.csproj)
+          echo "ShaderExtensions version: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check if current version needs release
