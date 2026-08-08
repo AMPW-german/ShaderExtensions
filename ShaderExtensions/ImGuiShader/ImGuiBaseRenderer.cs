@@ -11,6 +11,7 @@ using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
 using Core;
 using KSA;
+using KSA.Rendering;
 using RenderCore;
 
 namespace ShaderExtensions.ImGuiShader
@@ -59,22 +60,30 @@ namespace ShaderExtensions.ImGuiShader
             return shader;
         }
 
-        private RenderTarget renderTarget;
-        private readonly VkRenderPass renderPass;
+        private readonly RenderTarget renderTarget;
 
         private readonly BufferPair[] buffers;
         private int nextBuffer = 0;
 
-        public Framebuffer.FramebufferAttachment Target => renderTarget.ColorImage;
+        public RenderImage Target => renderTarget.ColorImage;
 
         public ImGuiBaseRenderer(Renderer renderer, VkExtent2D extent)
-          : base(nameof(ImGuiBaseRenderer), renderer, Program.MainPass, BaseShaders)
+          : this(
+              renderer,
+              new RenderTarget(
+                renderer,
+                $"{nameof(ImGuiBaseRenderer)}_{Guid.NewGuid():N}",
+                extent,
+                VkFormat.R8G8B8A8UNorm,
+                VkFormat.Undefined))
         {
-            buffers = new BufferPair[renderer.SwapchainImageCount];
+        }
 
-            renderTarget = new(renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
-            renderPass = renderTarget.CreateRenderPass();
-            renderTarget.BuildFramebuffer(renderPass);
+        private ImGuiBaseRenderer(Renderer renderer, RenderTarget renderTarget)
+          : base(nameof(ImGuiBaseRenderer), renderer, renderTarget, BaseShaders)
+        {
+            this.renderTarget = renderTarget;
+            buffers = new BufferPair[renderer.SwapchainImageCount];
 
             PipelineLayout = BasePipelineLayout.Value;
 
@@ -104,9 +113,7 @@ namespace ShaderExtensions.ImGuiShader
         public void Rebuild(VkExtent2D extent)
         {
             Renderer.Device.WaitIdle();
-            renderTarget.Dispose();
-            renderTarget = new(Renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
-            renderTarget.BuildFramebuffer(renderPass);
+            renderTarget.Rebuild((int)extent.Width, (int)extent.Height);
 
             RebuildFrameResources();
         }
@@ -154,12 +161,12 @@ namespace ShaderExtensions.ImGuiShader
             var size = new float2(renderTarget.Extent.Width, renderTarget.Extent.Height);
             var extent = new VkExtent2D(renderTarget.Extent.Width, renderTarget.Extent.Height);
             var rect = new VkRect2D(extent);
-            commandBuffer.BeginRenderPass(new VkRenderPassBeginInfo
-            {
-                RenderPass = renderPass,
-                Framebuffer = renderTarget.FrameBuffer,
-                RenderArea = rect,
-            }, VkSubpassContents.Inline);
+            renderTarget.BeginRendering(
+              commandBuffer,
+              default,
+              default,
+              VkAttachmentLoadOp.Clear,
+              VkAttachmentLoadOp.DontCare);
 
             SetupBuffers(drawList, bufs);
 
@@ -245,7 +252,10 @@ namespace ShaderExtensions.ImGuiShader
 
             platformIo.Renderer_RenderState = IntPtr.Zero;
 
-            commandBuffer.EndRenderPass();
+            renderTarget.EndRendering(
+              commandBuffer,
+              ImageBarrierInfo.Presets.SampledReadF,
+              default);
 
             return new float2x4(pxBounds, uvBounds);
         }

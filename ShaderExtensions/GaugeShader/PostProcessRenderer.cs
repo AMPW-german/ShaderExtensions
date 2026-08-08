@@ -12,7 +12,7 @@ namespace ShaderExtensions.GaugeShader
     //{
     //    private readonly GaugeCanvasEx canvas;
 
-    //    private RenderTarget renderTarget;
+    //    private PostRenderTarget PostRenderTarget;
     //    private readonly VkRenderPass renderPass;
 
     //    private readonly DescriptorSetLayoutEx bindingLayout;
@@ -27,12 +27,12 @@ namespace ShaderExtensions.GaugeShader
     //    {
     //        this.canvas = canvas;
 
-    //        renderTarget = new(renderer, this.GetHashCode().ToString(), new(500, 500), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
-    //        renderPass = renderTarget.CreateRenderPass();
-    //        renderTarget.BuildFramebuffer(renderPass);
+    //        PostRenderTarget = new(renderer, this.GetHashCode().ToString(), new(500, 500), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+    //        renderPass = PostRenderTarget.CreateRenderPass();
+    //        PostRenderTarget.BuildFramebuffer(renderPass);
 
     //        canvas.CanvasRenderer.ImguiTextureID = ImGuiBackend.Vulkan.AddTexture(
-    //          Program.LinearClampedSampler, renderTarget.ColorImage.ImageView);
+    //          Program.LinearClampedSampler, PostRenderTarget.ColorImage.ImageView);
 
     //        if (inShaderPaths[1] is not ShaderEx frag)
     //            throw new InvalidOperationException($"expected ShaderEx fragment shader");
@@ -52,7 +52,7 @@ namespace ShaderExtensions.GaugeShader
     //        inputInfo[0] = new VkDescriptorImageInfo
     //        {
     //            ImageLayout = VkImageLayout.ShaderReadOnlyOptimal,
-    //            ImageView = canvas.CanvasRenderer.RenderTarget.ColorImage.ImageView,
+    //            ImageView = canvas.CanvasRenderer.PostRenderTarget.ColorImage.ImageView,
     //            Sampler = Program.LinearClampedSampler,
     //        };
 
@@ -88,11 +88,11 @@ namespace ShaderExtensions.GaugeShader
     //    {
     //        Renderer.Device.WaitIdle();
     //        ImGuiBackend.Vulkan.RemoveTexture(canvas.CanvasRenderer.ImguiTextureID);
-    //        renderTarget.Dispose();
-    //        renderTarget = new(Renderer, this.GetHashCode().ToString(), new((int)size.X, (int)size.Y), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
-    //        renderTarget.BuildFramebuffer(renderPass);
+    //        PostRenderTarget.Dispose();
+    //        PostRenderTarget = new(Renderer, this.GetHashCode().ToString(), new((int)size.X, (int)size.Y), VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
+    //        PostRenderTarget.BuildFramebuffer(renderPass);
     //        canvas.CanvasRenderer.ImguiTextureID =
-    //          ImGuiBackend.Vulkan.AddTexture(Program.LinearClampedSampler, renderTarget.ColorImage.ImageView);
+    //          ImGuiBackend.Vulkan.AddTexture(Program.LinearClampedSampler, PostRenderTarget.ColorImage.ImageView);
 
     //        // also need to update the input binding
 
@@ -100,7 +100,7 @@ namespace ShaderExtensions.GaugeShader
     //        inputInfo[0] = new VkDescriptorImageInfo
     //        {
     //            ImageLayout = VkImageLayout.ShaderReadOnlyOptimal,
-    //            ImageView = canvas.CanvasRenderer.RenderTarget.ColorImage.ImageView,
+    //            ImageView = canvas.CanvasRenderer.PostRenderTarget.ColorImage.ImageView,
     //            Sampler = Program.LinearClampedSampler,
     //        };
 
@@ -118,12 +118,12 @@ namespace ShaderExtensions.GaugeShader
 
     //    public void Render(CommandBuffer commandBuffer, Viewport viewport)
     //    {
-    //        var extent = new VkExtent2D(renderTarget.Extent.Width, renderTarget.Extent.Height);
+    //        var extent = new VkExtent2D(PostRenderTarget.Extent.Width, PostRenderTarget.Extent.Height);
     //        var rect = new VkRect2D(extent);
     //        commandBuffer.BeginRenderPass(new VkRenderPassBeginInfo
     //        {
-    //            RenderPass = renderPass,
-    //            Framebuffer = renderTarget.FrameBuffer,
+    //            PostRenderTarget = renderPass,
+    //            Framebuffer = PostRenderTarget.FrameBuffer,
     //            RenderArea = rect,
     //        }, VkSubpassContents.Inline);
 

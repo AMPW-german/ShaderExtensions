@@ -13,7 +13,6 @@ jobs:
   build-package:
     runs-on: ubuntu-slim
     outputs:
-      versionprefix_changed: ${{ steps.versionprefix.outputs.changed }}
       version: ${{ steps.versionprefix.outputs.version }}
       ksa_version: ${{ steps.ksa-version.outputs.version }}
       artifact_name: ${{ steps.artifact-name.outputs.name }}
@@ -24,8 +23,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -209,7 +206,9 @@ jobs:
             echo "KSA_VERSION.txt not found in deps/ksa. Cannot determine KSA version." >&2
             exit 1
           fi
-          echo "version=$(cat "$ksa_version_txt")" >> "$GITHUB_OUTPUT"
+          ksa_version=$(cat "$ksa_version_txt")
+          echo "KSA version: $ksa_version"
+          echo "version=$ksa_version" >> "$GITHUB_OUTPUT"
 
       - name: Switch project references to CI DLL hint paths
         shell: bash
@@ -229,30 +228,20 @@ jobs:
           project_path.write_text(content, encoding="utf-8")
           PY
 
-      - name: Detect VersionPrefix change on main push
+      - name: Collect VersionPrefix
         id: versionprefix
         shell: bash
         run: |
           version=v$(grep -oPm1 '(?<=<VersionPrefix>)[^<]+' ShaderExtensions/ShaderExtensions.csproj)
+          echo "ShaderExtensions version: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
-          before="${{ github.event.before }}"
-          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if git diff "$before" "${{ github.sha }}" -- ShaderExtensions/ShaderExtensions.csproj | grep -q 'VersionPrefix'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Check if current version needs release
         id: release-check
         shell: bash
         run: |
           if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Release needed: false"
             echo "release_needed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -267,12 +256,17 @@ jobs:
           current_version=$(echo "$release_response" | jq -r '.tag_name // empty')
 
           if [ -z "$current_version" ]; then
-            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+            release_needed=true
           elif [ "$new_version" != "$current_version" ]; then
-            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+            release_needed=true
           else
-            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+            release_needed=false
           fi
+
+          echo "Current latest release: ${current_version:-none}"
+          echo "New version: $new_version"
+          echo "Release needed: $release_needed"
+          echo "release_needed=$release_needed" >> "$GITHUB_OUTPUT"
 
       - name: Restore dependencies
         run: dotnet restore ShaderExtensions/ShaderExtensions.csproj
@@ -295,12 +289,14 @@ jobs:
 
           if [ "$CONFIGURATION" = "Debug" ]; then
             artifact_name="ShaderExtensions-${version}-${short_hash}-debug"
-          elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ] && [ "${{ steps.versionprefix.outputs.changed }}" = "true" ]; then
+          elif [ "${{ steps.release-check.outputs.release_needed }}" = "true" ]; then
             artifact_name="ShaderExtensions-${version}"
           else
             artifact_name="ShaderExtensions-${version}-${short_hash}"
           fi
 
+          echo "Build configuration: $CONFIGURATION"
+          echo "Artifact name: $artifact_name"
           echo "name=$artifact_name" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact

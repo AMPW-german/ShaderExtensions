@@ -1,9 +1,10 @@
-﻿using Brutal.VulkanApi;
+﻿using Brutal;
+using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
-using Brutal;
 using Core;
 using KittenExtensions;
 using KSA;
+using System.Reflection;
 using System.Xml.Serialization;
 
 namespace ShaderExtensions
@@ -12,6 +13,8 @@ namespace ShaderExtensions
     //[KxAssetInject(typeof(GaugeComponent), nameof(GaugeComponent.FragmentShader), "FragmentEx")]
     public class ShaderEx : ShaderReference, IBinder
     {
+        private const int MIN_PUSH_CONSTANT_SIZE_BYTES = 128;
+
         [XmlElement("TextureBinding", typeof(TextureBindingReference))]
         public List<SerializedId> XmlBindings = [];
 
@@ -119,8 +122,9 @@ namespace ShaderExtensions
             for (var i = 0; i < TYPE_COUNT; i++)
                 poolSizes[i] = new VkDescriptorPoolSize { Type = DESCRIPTOR_TYPES[i], DescriptorCount = 0 };
 
-            // always have one base image input (gauge font atlas or subpass 1 output)
+            // always have one base image input (gauge font atlas or renderpass 1 output)
             poolSizes[TypeIndex(baseType)].DescriptorCount = 1;
+            poolSizes[TypeIndex(VkDescriptorType.UniformBuffer)].DescriptorCount = 1;
 
             foreach (var binding in Bindings)
                 poolSizes[TypeIndex(binding.DescriptorType)].DescriptorCount += binding.DescriptorCount;
@@ -155,14 +159,23 @@ namespace ShaderExtensions
           VkAllocator allocator = null)
         {
             var bindingCount = Bindings.Count;
-            Span<VkDescriptorSetLayoutBinding> bindings = stackalloc VkDescriptorSetLayoutBinding[1 + bindingCount];
+            Span<VkDescriptorSetLayoutBinding> bindings = stackalloc VkDescriptorSetLayoutBinding[2 + bindingCount];
             bindings[0] = baseBinding;
+
+            bindings[1] = new VkDescriptorSetLayoutBinding
+            {
+                Binding = 1,
+                DescriptorType = VkDescriptorType.UniformBuffer,
+                DescriptorCount = 1,
+                StageFlags = VkShaderStageFlags.FragmentBit,
+            };
+
             for (var i = 0; i < bindingCount; i++)
             {
                 var binding = Bindings[i];
-                bindings[i + 1] = new VkDescriptorSetLayoutBinding
+                bindings[i + 2] = new VkDescriptorSetLayoutBinding
                 {
-                    Binding = i + 1,
+                    Binding = i + 2,
                     DescriptorType = binding.DescriptorType,
                     DescriptorCount = binding.DescriptorCount,
                     StageFlags = VkShaderStageFlags.FragmentBit,
@@ -183,9 +196,11 @@ namespace ShaderExtensions
         public unsafe void UpdateDescriptorSets(Device device, VkWriteDescriptorSet baseWrite)
         {
             var bindingCount = Bindings.Count;
-            Span<int> writeCounts = [0, 0, 0];
+            Span<int> writeCounts = [0, 0, 0, 0];
             foreach (var binding in Bindings)
                 writeCounts[(int)TypeWriteType(binding.DescriptorType)] += binding.DescriptorCount;
+
+            VkDescriptorBufferInfo timeInfo = SharedTimeBuffer.GetDescriptorInfoInstance();
 
             VkDescriptorImageInfo* imageInfos =
               stackalloc VkDescriptorImageInfo[writeCounts[(int)WriteType.ImageInfo]];
@@ -194,11 +209,19 @@ namespace ShaderExtensions
             VkBufferView* texelBufferViews =
               stackalloc VkBufferView[writeCounts[(int)WriteType.TexelBufferView]];
 
-            Span<VkWriteDescriptorSet> writes = stackalloc VkWriteDescriptorSet[bindingCount + 1];
-            Span<int> writeIndices = [0, 0, 0];
+            Span<VkWriteDescriptorSet> writes = stackalloc VkWriteDescriptorSet[bindingCount + 2];
+            Span<int> writeIndices = [0, 0, 0, 0];
 
             writes[0] = baseWrite;
-            var dset = writes[0].DstSet;
+
+            writes[1] = new VkWriteDescriptorSet
+            {
+                DescriptorType = VkDescriptorType.UniformBuffer,
+                DstBinding = 1,
+                DescriptorCount = 1,
+                DstSet = baseWrite.DstSet,
+                BufferInfo = &timeInfo,
+            };
 
             for (var i = 0; i < bindingCount; i++)
             {
@@ -207,12 +230,12 @@ namespace ShaderExtensions
                 var start = writeIndices[(int)wtype];
                 var count = binding.DescriptorCount;
 
-                writes[i + 1] = new VkWriteDescriptorSet
+                writes[i + 2] = new VkWriteDescriptorSet
                 {
                     DescriptorType = binding.DescriptorType,
-                    DstBinding = i + 1,
+                    DstBinding = i + 2,
                     DescriptorCount = count,
-                    DstSet = dset,
+                    DstSet = baseWrite.DstSet,
                     ImageInfo = &imageInfos[writeIndices[(int)WriteType.ImageInfo]],
                     BufferInfo = &bufferInfos[writeIndices[(int)WriteType.BufferInfo]],
                     TexelBufferView = &texelBufferViews[writeIndices[(int)WriteType.TexelBufferView]],
@@ -232,18 +255,20 @@ namespace ShaderExtensions
             device.UpdateDescriptorSets(writes, []);
         }
 
-        private const int TYPE_COUNT = 3;
+        private const int TYPE_COUNT = 4;
         private static readonly VkDescriptorType[] DESCRIPTOR_TYPES =
         [
-          VkDescriptorType.CombinedImageSampler,
-    VkDescriptorType.UniformBufferDynamic,
-    VkDescriptorType.InputAttachment,
-  ];
+            VkDescriptorType.CombinedImageSampler,
+            VkDescriptorType.UniformBuffer,
+            VkDescriptorType.UniformBufferDynamic,
+            VkDescriptorType.InputAttachment,
+        ];
         private static int TypeIndex(VkDescriptorType type) => type switch
         {
             VkDescriptorType.CombinedImageSampler => 0,
-            VkDescriptorType.UniformBufferDynamic => 1,
-            VkDescriptorType.InputAttachment => 2,
+            VkDescriptorType.UniformBuffer => 1,
+            VkDescriptorType.UniformBufferDynamic => 2,
+            VkDescriptorType.InputAttachment => 3,
             _ => throw new NotSupportedException($"{type}"),
         };
 
@@ -251,6 +276,7 @@ namespace ShaderExtensions
         private static WriteType TypeWriteType(VkDescriptorType type) => type switch
         {
             VkDescriptorType.CombinedImageSampler => WriteType.ImageInfo,
+            VkDescriptorType.UniformBuffer => WriteType.BufferInfo,
             VkDescriptorType.UniformBufferDynamic => WriteType.BufferInfo,
             VkDescriptorType.InputAttachment => WriteType.ImageInfo,
             _ => throw new NotSupportedException($"{type}"),
@@ -279,8 +305,5 @@ namespace ShaderExtensions
 
             return Hash.ToString();
         }
-
-        private const int MIN_PUSH_CONSTANT_SIZE_BYTES = 128;
     }
-
 }

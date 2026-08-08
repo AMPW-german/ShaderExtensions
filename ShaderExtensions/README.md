@@ -32,38 +32,16 @@ Normal post processing shaders use the `PostProcessingShader` asset and global p
 ### Limitations:
 
 The shaders only target the main window, any other windows are ignored. Additionally, these shaders can't be disabled and will always run at their designated stage (use custom bindings to conditionally return the original color and achieve the same effect as disabling the shaders).\
-This is only designed for unique Renderpass/Subpass combinations. While it won't crash it there is more than shader per Pass the execution order is no longer guaranteed. Sampler2D shaders in the **same** renderpass will always run before subpass shaders.
+Each shader gets its own pass, ordered by `RenderPassId`. If more than one shader shares the same `RenderPassId` the execution order between them is no longer guaranteed.
 
-### Shader types
+> **Breaking change:** subpasses are no longer supported. The `SubpassId` and `RequiresUniqueRenderpass` attributes have been removed, and shaders that still declare either of them are skipped with an error in the log. Every shader now samples its input through a `sampler2D`; `subpassInput` / `subpassLoad` are no longer available.
 
-#### Subpass shaders
+### Shader type
 
-Normal GlobalPostShaders have a uniform `subpassInput` at set 1 binding 0 as pixel color source. They use the `SubpassId` for ordering the subpasses.\
-It is recommended to use subpasses with the same renderpass if free input sampling is not neccesary.
-
-```xml
-<GlobalPostShader Id="GEffectFrag" Path="Shaders/GEffectShader.frag" RenderPassId="32" SubpassId="64"/>
-```
-
-```glsl
-#version 450 core
-
-layout(location = 0) out vec4 outColor;
-layout(set = 1, binding = 0) uniform subpassInput Source;
-
-void main()
-{
-    vec4 c = subpassLoad(Source);
-    outColor = c;
-}
-```
-
-#### Sampler2D shaders
-
-Shaders that need a sampler2D as input (this allows free sampling of the input) need their own dedicated renderpass which can be done by setting the `RequiresUniqueRenderpass` attribute to `true`. They are not using the SubpassId attribute.
+Every post processing shader has a `sampler2D` at set 1 binding 0 as pixel color source, which allows free sampling of the input. The shared time buffer is available at set 1 binding 1. Ordering is done exclusively through the `RenderPassId` attribute.
 
 ```xml
-<GlobalPostShader Id="BlurFrag" Path="Shaders/Blur.frag" RenderPassId="16" RequiresUniqueRenderpass="true" />
+<GlobalPostShader Id="BlurFrag" Path="Shaders/Blur.frag" RenderPassId="16" />
 ```
 
 ```glsl
@@ -71,6 +49,13 @@ Shaders that need a sampler2D as input (this allows free sampling of the input) 
 
 layout(location = 0) out vec4 outColor;
 layout(set = 1, binding = 0) uniform sampler2D Source;
+layout(std140, set = 1, binding = 1) uniform ShaderTime {
+    uint FrameNumber;
+    float DeltaTime;
+    float RealTimeSinceStart;
+    float TimeSinceStart;
+    float TimeWarpSpeed;
+} Time;
 layout(location = 0) in vec2 Uv;
 
 void main()
@@ -80,9 +65,35 @@ void main()
 }
 ```
 
+### Time buffer
+
+Every `ShaderEx` fragment shader receives the same time data once per frame. The buffer is read-only and is declared at binding 1 in the shader's descriptor set. `FrameNumber` is a `uint` and wraps after `4,294,967,295` frames.
+
+```glsl
+layout(std140, set = 1, binding = 1) uniform ShaderTime {
+    uint FrameNumber;
+    float DeltaTime;
+    float RealTimeSinceStart;
+    float TimeSinceStart;
+    float TimeWarpSpeed;
+} Time;
+```
+
+For ImGui post-processing shaders, use `set = 0` instead of `set = 1`:
+
+```glsl
+layout(std140, set = 0, binding = 1) uniform ShaderTime {
+    uint FrameNumber;
+    float DeltaTime;
+    float RealTimeSinceStart;
+    float TimeSinceStart;
+    float TimeWarpSpeed;
+} Time;
+```
+
 ## ImGui Post-Processing
 
-To add a post-processing shader to an ImGui window, use the `<ImGuiShader>` asset with a vertex and fragment shader specified. The included `ImGuiVertexPost` vertex shader draws one rect covering the bounding box of the imgui rendering calls, and can be used in most cases. The fragment shader is a `ShaderEx` asset that will have `layout(set=0, binding=0)` bound to the rendered ImGui window, with custom bindings starting at `layout(set=0, binding=1)`.
+To add a post-processing shader to an ImGui window, use the `<ImGuiShader>` asset with a vertex and fragment shader specified. The included `ImGuiVertexPost` vertex shader draws one rect covering the bounding box of the imgui rendering calls, and can be used in most cases. The fragment shader is a `ShaderEx` asset that will have `layout(set=0, binding=0)` bound to the rendered ImGui window, the shared time buffer at `layout(set=0, binding=1)`, and custom bindings starting at `layout(set=0, binding=2)`.
 
 ```xml
 <Assets>
@@ -98,6 +109,13 @@ To add a post-processing shader to an ImGui window, use the `<ImGuiShader>` asse
 
 layout(location = 0) out vec4 outColor;
 layout(set=0, binding=0) uniform sampler2D imguiTex; // rendered ImGui Window
+layout(std140, set=0, binding=1) uniform ShaderTime {
+  uint FrameNumber;
+  float DeltaTime;
+  float RealTimeSinceStart;
+  float TimeSinceStart;
+  float TimeWarpSpeed;
+} Time;
 layout(location = 0) in struct {
   vec2 Px; // screen pixel coord
   vec2 Uv; // screen uv coord
@@ -175,13 +193,13 @@ Additional bindings can only be added to a post processing shaders using one of 
 </Component>
 ```
 
-The additional bindings will be available in the fragment shader on set 1, starting from binding 1
+The shared time buffer occupies binding 1. Additional bindings are available in post-processing fragment shaders on set 1, starting from binding 2. For ImGui post-processing shaders, use set 0 with the same binding numbers.
 
 ```glsl
 // in MyShader.frag
-layout(set = 1, binding = 1) uniform sampler2D texture1;
-layout(set = 1, binding = 2) uniform sampler2D texture2;
-layout(set = 1, binding = 3) uniform MyBuffer {
+layout(set = 1, binding = 2) uniform sampler2D texture1;
+layout(set = 1, binding = 3) uniform sampler2D texture2;
+layout(set = 1, binding = 4) uniform MyBuffer {
   float v1;
   float v2;
 };

@@ -2,96 +2,79 @@ using Brutal.VulkanApi;
 using Brutal.VulkanApi.Abstractions;
 using Core;
 using KSA;
-using static KSA.Framebuffer;
+using KSA.Rendering;
 
 namespace ShaderExtensions.PostProcessing.PostImgui
 {
+    /// <summary>
+    /// Runs the post-imgui post processing chain. The finished swapchain image (game + UI) is copied into a
+    /// tracked render image, the chain is executed on it, and the result is copied back to the swapchain image.
+    /// </summary>
     internal static class GlobalPostShaderHandler
     {
-        public static OffscreenTarget offscreenTarget2;
-        private static List<GlobalPostRenderData> ShaderData = [];
+        private static readonly PostProcessingChain Chain = new(preImgui: false);
 
-        public static unsafe void Rebuild()
+        /// <summary>Holds a copy of the finished swapchain image, used as the chain source.</summary>
+        internal static RenderTarget SourceTarget;
+
+        public static void Rebuild()
         {
-            Program.GetRenderer().Device.WaitIdle();
+            Renderer renderer = Program.GetRenderer();
+            renderer.Device.WaitIdle();
 
-            foreach (var shader in ShaderData) shader.Dispose();
-            ShaderData.Clear();
-            PostProcessingInputResolver.Clear(preImgui: false);
+            EnsureSourceTarget(renderer);
 
-            FramebufferAttachment source = offscreenTarget2.ColorImage;
+            Chain.Build(
+                "ShaderExtensions_PostImgui",
+                PostProcessingChain.FilterSupported(GlobalPostShaderAsset.AllShaders),
+                SourceTarget.ColorImage);
+        }
 
-            foreach (var passKvp in GlobalPostShaderAsset.ShadersByPassAndSubpass)
+        private static void EnsureSourceTarget(Renderer renderer)
+        {
+            if (SourceTarget is not null &&
+                SourceTarget.Extent.Width == renderer.Extent.Width &&
+                SourceTarget.Extent.Height == renderer.Extent.Height)
             {
-                List<GlobalPostShaderAsset> uniqueSubpassShaders = passKvp.Value.SelectMany(kvp => kvp.Value).Where(s => s.RequiresUniqueRenderpass).ToList();
-                uniqueSubpassShaders.ForEach(s =>
-                {
-                    GlobalPostRenderData renderData = new GlobalPostRenderData([s], source);
-                    ShaderData.Add(renderData);
-                    source = renderData.TargetAttachment;
-                });
-
-                List<GlobalPostShaderAsset> subpassShaders = passKvp.Value.SelectMany(kvp => kvp.Value).Where(s => !s.RequiresUniqueRenderpass).ToList();
-                if (subpassShaders.Count > 0)
-                {
-                    GlobalPostRenderData renderData = new GlobalPostRenderData(subpassShaders, source);
-                    ShaderData.Add(renderData);
-                    source = renderData.TargetAttachment;
-                }
+                return;
             }
+
+            SourceTarget?.Dispose();
+            SourceTarget = new RenderTarget(
+                renderer,
+                "ShaderExtensions_PostImguiSource",
+                renderer.Extent,
+                renderer.ColorFormat,
+                VkFormat.Undefined);
         }
 
         /// <summary>
-        /// Called after the UI renderpass has finished
+        /// Called after the UI renderpass has finished.
         /// </summary>
-        public static unsafe void RenderNow(CommandBuffer commandBuffer, FrameResources destFrameResources, int dynamicOffset = 0)
+        public static void RenderNow(CommandBuffer commandBuffer, FrameResources destFrameResources, int dynamicOffset = 0)
         {
-            Renderer renderer = Program.GetRenderer();
-            VkExtent2D extent = renderer.Extent;
+            if (Chain.PassCount == 0) return;
 
-            FramebufferAttachment lastAttachment = offscreenTarget2.ColorImage;
+            PostProcessingChain.CopyFromRaw(
+                commandBuffer,
+                destFrameResources.ColorImage,
+                VkImageLayout.PresentSrcKHR,
+                SourceTarget.ColorImage);
 
-            foreach (var shaderData in ShaderData)
-            {
-                shaderData.Render(commandBuffer);
-                lastAttachment = shaderData.TargetAttachment;
-            }
+            Chain.Render(commandBuffer);
 
-            // Copy the result to the destination framebuffer's color attachment
-            commandBuffer.CopyImage(
-                srcImage: lastAttachment.Image,
-                srcImageLayout: VkImageLayout.ColorAttachmentOptimal,
-                dstImage: destFrameResources.ColorImage,
-                dstImageLayout: VkImageLayout.ColorAttachmentOptimal,
-                pRegions: new ReadOnlySpan<VkImageCopy>(new VkImageCopy[]
-                {
-                    new VkImageCopy
-                    {
-                        SrcSubresource = new VkImageSubresourceLayers
-                        {
-                            AspectMask = VkImageAspectFlags.ColorBit,
-                            MipLevel = 0,
-                            BaseArrayLayer = 0,
-                            LayerCount = 1
-                        },
-                        SrcOffset = new VkOffset3D(0, 0, 0),
-                        DstSubresource = new VkImageSubresourceLayers
-                        {
-                            AspectMask = VkImageAspectFlags.ColorBit,
-                            MipLevel = 0,
-                            BaseArrayLayer = 0,
-                            LayerCount = 1
-                        },
-                        DstOffset = new VkOffset3D(0, 0, 0),
-                        Extent = new VkExtent3D
-                        {
-                            Width = renderer.Extent.Width,
-                            Height = renderer.Extent.Height,
-                            Depth = 1
-                        }
-                    }
-                })
-            );
+            PostProcessingChain.CopyToRaw(
+                commandBuffer,
+                Chain.Output,
+                destFrameResources.ColorImage,
+                VkImageLayout.PresentSrcKHR);
+        }
+
+        public static void Dispose()
+        {
+            Chain.Dispose();
+            SourceTarget?.Dispose();
+            SourceTarget = null;
         }
     }
 }

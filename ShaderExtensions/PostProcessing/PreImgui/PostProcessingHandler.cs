@@ -1,101 +1,50 @@
-﻿using Brutal.VulkanApi;
+using Brutal.VulkanApi;
 using Core;
 using KSA;
+using KSA.Rendering;
 using System.Reflection;
-using static KSA.Framebuffer;
 
 namespace ShaderExtensions.PostProcessing.PreImgui
 {
+    /// <summary>
+    /// Runs the pre-imgui post processing chain on the game offscreen target before the UI is drawn.
+    /// </summary>
     internal static class PostProcessingHandler
     {
-        private static List<PostProcessingRenderData> ShaderData = [];
+        private static readonly PostProcessingChain Chain = new(preImgui: true);
 
-        public static unsafe void Rebuild()
+        private static readonly FieldInfo OffscreenTargetField =
+            typeof(Program).GetField("_offscreenTarget", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        internal static RenderTarget GameOffscreenTarget =>
+            (RenderTarget)OffscreenTargetField.GetValue(Program.Instance);
+
+        public static void Rebuild()
         {
             Program.GetRenderer().Device.WaitIdle();
 
-            foreach (var shader in ShaderData) shader.Dispose();
-            ShaderData.Clear();
-            PostProcessingInputResolver.Clear(preImgui: true);
+            RenderTarget offscreenTarget = GameOffscreenTarget;
+            if (offscreenTarget is null) return;
 
-            OffscreenTarget offscreenTarget = typeof(Program).GetField("_offscreenTarget", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(Program.Instance) as OffscreenTarget;
-
-            FramebufferAttachment source = offscreenTarget.ColorImage;
-
-            foreach (var passKvp in PostProcessingShaderAsset.ShadersByPassAndSubpass)
-            {
-                List<PostProcessingShaderAsset> uniqueSubpassShaders = passKvp.Value.SelectMany(kvp => kvp.Value).Where(s => s.RequiresUniqueRenderpass).ToList();
-                uniqueSubpassShaders.ForEach(s =>
-                {
-                    PostProcessingRenderData renderData = new PostProcessingRenderData([s], source, offscreenTarget.ColorImage.Format);
-                    ShaderData.Add(renderData);
-                    source = renderData.TargetAttachment;
-                });
-
-                List<PostProcessingShaderAsset> subpassShaders = passKvp.Value.SelectMany(kvp => kvp.Value).Where(s => !s.RequiresUniqueRenderpass).ToList();
-                if (subpassShaders.Count > 0)
-                {
-                    PostProcessingRenderData renderData = new PostProcessingRenderData(subpassShaders, source, offscreenTarget.ColorImage.Format);
-                    ShaderData.Add(renderData);
-                    source = renderData.TargetAttachment;
-                }
-            }
+            Chain.Build(
+                "ShaderExtensions_PreImgui",
+                PostProcessingChain.FilterSupported(PostProcessingShaderAsset.AllShaders),
+                offscreenTarget.ColorImage);
         }
 
         /// <summary>
-        /// Called before the UI renderpass
+        /// Called before the UI renderpass.
         /// </summary>
-        public static unsafe void RenderNow(CommandBuffer commandBuffer)
+        public static void RenderNow(CommandBuffer commandBuffer)
         {
-            if (ShaderData.Count == 0) return;
+            if (Chain.PassCount == 0) return;
 
-            OffscreenTarget offscreenTarget = typeof(Program).GetField("_offscreenTarget", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(Program.Instance) as OffscreenTarget;
-            Renderer renderer = Program.GetRenderer();
-            VkExtent2D extent = renderer.Extent;
+            Chain.Render(commandBuffer);
 
-            FramebufferAttachment lastAttachment = default;
-
-            foreach (var shaderData in ShaderData)
-            {
-                shaderData.Render(commandBuffer);
-                lastAttachment = shaderData.TargetAttachment;
-            }
-
-            // Copy the result back to the offscreen target
-            commandBuffer.CopyImage(
-                srcImage: lastAttachment.Image,
-                srcImageLayout: VkImageLayout.ColorAttachmentOptimal,
-                dstImage: offscreenTarget.ColorImage.Image,
-                dstImageLayout: VkImageLayout.ColorAttachmentOptimal,
-                pRegions: new ReadOnlySpan<VkImageCopy>(new VkImageCopy[]
-                {
-                    new VkImageCopy
-                    {
-                        SrcSubresource = new VkImageSubresourceLayers
-                        {
-                            AspectMask = VkImageAspectFlags.ColorBit,
-                            MipLevel = 0,
-                            BaseArrayLayer = 0,
-                            LayerCount = 1
-                        },
-                        SrcOffset = new VkOffset3D(0, 0, 0),
-                        DstSubresource = new VkImageSubresourceLayers
-                        {
-                            AspectMask = VkImageAspectFlags.ColorBit,
-                            MipLevel = 0,
-                            BaseArrayLayer = 0,
-                            LayerCount = 1
-                        },
-                        DstOffset = new VkOffset3D(0, 0, 0),
-                        Extent = new VkExtent3D
-                        {
-                            Width = renderer.Extent.Width,
-                            Height = renderer.Extent.Height,
-                            Depth = 1
-                        }
-                    }
-                })
-            );
+            // Feed the result back into the image the game composites from.
+            PostProcessingChain.CopyTo(commandBuffer, Chain.Output, GameOffscreenTarget.ColorImage);
         }
+
+        public static void Dispose() => Chain.Dispose();
     }
 }

@@ -32,38 +32,16 @@ Normal post processing shaders use the `PostProcessingShader` asset and global p
 ### Limitations:
 
 The shaders only target the main window, any other windows are ignored. Additionally, these shaders can't be disabled and will always run at their designated stage (use custom bindings to conditionally return the original color and achieve the same effect as disabling the shaders).\
-This is only designed for unique Renderpass/Subpass combinations. While it won't crash it there is more than shader per Pass the execution order is no longer guaranteed. Sampler2D shaders in the **same** renderpass will always run before subpass shaders.
+Each shader gets its own pass, ordered by `RenderPassId`. If more than one shader shares the same `RenderPassId` the execution order between them is no longer guaranteed.
 
-### Shader types
+> **Breaking change:** subpasses are no longer supported. The `SubpassId` and `RequiresUniqueRenderpass` attributes have been removed, and shaders that still declare either of them are skipped with an error in the log. Every shader now samples its input through a `sampler2D`; `subpassInput` / `subpassLoad` are no longer available.
 
-#### Subpass shaders
+### Shader type
 
-Normal GlobalPostShaders have a uniform `subpassInput` at set 1 binding 0 as pixel color source. They use the `SubpassId` for ordering the subpasses.\
-It is recommended to use subpasses with the same renderpass if free input sampling is not neccesary.
-
-```xml
-<GlobalPostShader Id="GEffectFrag" Path="Shaders/GEffectShader.frag" RenderPassId="32" SubpassId="64"/>
-```
-
-```glsl
-#version 450 core
-
-layout(location = 0) out vec4 outColor;
-layout(set = 1, binding = 0) uniform subpassInput Source;
-
-void main()
-{
-    vec4 c = subpassLoad(Source);
-    outColor = c;
-}
-```
-
-#### Sampler2D shaders
-
-Shaders that need a sampler2D as input (this allows free sampling of the input) need their own dedicated renderpass which can be done by setting the `RequiresUniqueRenderpass` attribute to `true`. They are not using the SubpassId attribute.
+Every post processing shader has a `sampler2D` at set 1 binding 0 as pixel color source, which allows free sampling of the input. Ordering is done exclusively through the `RenderPassId` attribute.
 
 ```xml
-<GlobalPostShader Id="BlurFrag" Path="Shaders/Blur.frag" RenderPassId="16" RequiresUniqueRenderpass="true" />
+<GlobalPostShader Id="BlurFrag" Path="Shaders/Blur.frag" RenderPassId="16" />
 ```
 
 ```glsl

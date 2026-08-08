@@ -1,6 +1,7 @@
 ﻿using Brutal.VulkanApi;
 using Core;
 using KSA;
+using KSA.Rendering;
 using ShaderExtensions.PostProcessing.PostImgui;
 using ShaderExtensions.PostProcessing.PreImgui;
 using System.Xml.Serialization;
@@ -12,21 +13,17 @@ namespace ShaderExtensions.PostProcessing
     /// </summary>
     public class PostProcessingInputReference : SerializedId, IShaderBinding
     {
-        private Framebuffer.FramebufferAttachment attachment;
+        private RenderImage attachment;
         private bool resolved;
 
-        internal Framebuffer.FramebufferAttachment Attachment => resolved
+        internal RenderImage Attachment => resolved
             ? attachment
-            : throw new InvalidOperationException($"{nameof(PostProcessingInputReference)} for RenderPassId {RenderPassId}, SubpassId {SubpassId} has not been resolved.");
+            : throw new InvalidOperationException($"{nameof(PostProcessingInputReference)} for RenderPassId {RenderPassId} has not been resolved.");
 
         [XmlAttribute]
         public int RenderPassId { get; set; }
         [XmlIgnore]
         public bool RenderPassIdSpecified { get; set; }
-        [XmlAttribute]
-        public int SubpassId { get; set; }
-        [XmlIgnore]
-        public bool SubpassIdSpecified { get; set; }
         [XmlAttribute]
         public bool PreImgui { get; set; } = false; // Allows post imgui shaders to access pre imgui shader inputs
         [XmlIgnore]
@@ -48,38 +45,19 @@ namespace ShaderExtensions.PostProcessing
 
         public void Initialize(PostProcessingShaderAsset parent)
         {
-            if (!SubpassIdSpecified)
-            {
-                throw new InvalidOperationException($"{nameof(SubpassId)} is required.");
-            }
-
-            if (!RenderPassIdSpecified)
-            {
-                RenderPassId = parent.RenderPassId;
-            }
+            if (!RenderPassIdSpecified) throw new MissingFieldException($"{nameof(PostProcessingInputReference)} for PostProcessingShaderAsset {parent.Id} must specify a RenderPassId.");
 
             PreImgui = true; // pre imgui shaders can only use pre imgui inputs
         }
 
         public void Initialize(GlobalPostShaderAsset parent)
         {
-            if (!SubpassIdSpecified)
-            {
-                throw new InvalidOperationException($"{nameof(SubpassId)} is required.");
-            }
+            if (!RenderPassIdSpecified) throw new MissingFieldException($"{nameof(PostProcessingInputReference)} for GlobalPostShaderAsset {parent.Id} must specify a RenderPassId.");
 
-            if (!RenderPassIdSpecified)
-            {
-                RenderPassId = parent.RenderPassId;
-            }
-
-            if (!PreImguiSpecified)
-            {
-                PreImgui = false;
-            }
+            if (!PreImguiSpecified) PreImgui = false;
         }
 
-        public void Resolve(Framebuffer.FramebufferAttachment attachment)
+        public void Resolve(RenderImage attachment)
         {
             this.attachment = attachment;
             resolved = true;
@@ -87,10 +65,7 @@ namespace ShaderExtensions.PostProcessing
 
         public void WriteDescriptors(BindingDescriptorWrites write)
         {
-            if (!resolved)
-            {
-                throw new InvalidOperationException($"{nameof(PostProcessingInputReference)} for RenderPassId {RenderPassId}, SubpassId {SubpassId} has not been resolved.");
-            }
+            if (!resolved) throw new InvalidOperationException($"{nameof(PostProcessingInputReference)} for RenderPassId {RenderPassId} has not been resolved.");
 
             write.ImageInfo[0] = new VkDescriptorImageInfo
             {

@@ -8,7 +8,6 @@ using Brutal.Numerics;
 using Brutal.VulkanApi;
 using Core;
 using KSA;
-using KSA.Rendering;
 
 namespace ShaderExtensions.ImGuiShader
 {
@@ -20,7 +19,6 @@ namespace ShaderExtensions.ImGuiShader
         private static readonly List<ViewportRenderer> viewports = [];
         private static readonly Dictionary<ImGuiID, ViewportRenderer> viewportsByID = [];
         private static readonly Dictionary<KeyHash, List<ImGuiPostRenderer>> orphanedRenderers = [];
-        private static readonly List<ImGuiPostRenderer> activeRenderers = [];
 
         private static Action<ImTextureDataPtr> UpdateTexture => field ??=
           typeof(ImGuiBackendVulkanImpl)
@@ -29,7 +27,6 @@ namespace ShaderExtensions.ImGuiShader
 
         public static void Render(Renderer renderer, CommandBuffer commandBuffer)
         {
-            activeRenderers.Clear();
             foreach (var viewport in viewports)
                 viewport.Reset();
 
@@ -79,20 +76,10 @@ namespace ShaderExtensions.ImGuiShader
                     if (FindCustomRenderer(drawList) is not uint key)
                         continue;
                     var r = viewport.GetRenderer(renderer, key);
-                    activeRenderers.Add(r);
 
                     r.Render(commandBuffer, drawData, drawList);
                 }
             }
-
-            Span<ImageTransition> transitions = stackalloc ImageTransition[activeRenderers.Count];
-            for (var i = 0; i < activeRenderers.Count; i++)
-                transitions[i] = new(
-                  activeRenderers[i].Target,
-                  ImageBarrierInfo.Presets.ColorAttachmentWrite,
-                  ImageBarrierInfo.Presets.SampledReadFragment);
-
-            commandBuffer.TransitionImages2(transitions);
         }
 
         public static void RebuildAll()
