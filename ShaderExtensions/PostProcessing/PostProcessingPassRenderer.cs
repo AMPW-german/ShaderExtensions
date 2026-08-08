@@ -113,10 +113,14 @@ namespace ShaderExtensions.PostProcessing
 
             shader.PushConstants(commandBuffer, PipelineLayout);
 
-            int bindingCount = Math.Max(1, bindingLayout.Descriptors.Sum(kvp => kvp.Value) - 1);
-            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[bindingCount];
+            var dynamicOffsetCount = 1;
+            foreach (var binding in shader.Bindings)
+                if (binding.DescriptorType == VkDescriptorType.UniformBufferDynamic)
+                    dynamicOffsetCount += binding.DescriptorCount;
+
+            Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[dynamicOffsetCount];
+            dynamicOffsets.Clear();
             dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
-            dynamicOffsets[1..].Fill(UniformBufferEx.minUniformBufferOffsetAlignment);
 
             commandBuffer.BindDescriptorSets(
                 VkPipelineBindPoint.Graphics, PipelineLayout, 0,

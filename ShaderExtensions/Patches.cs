@@ -8,6 +8,7 @@ using ShaderExtensions.GaugeShader;
 using ShaderExtensions.ImGuiShader;
 using ShaderExtensions.PostProcessing.PostImgui;
 using ShaderExtensions.PostProcessing.PreImgui;
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -21,8 +22,28 @@ namespace ShaderExtensions
         {
             // We want to load before main, but after all mod assemblies are loaded in
             AssetEx.Init();
+
         }
 
+        internal static Stopwatch timeSinceStart;
+
+        [HarmonyPatch(typeof(Program), "RenderGame"), HarmonyPrefix]
+        internal static void Program_RenderGame_Prefix(double dt)
+        {
+            timeSinceStart ??= Stopwatch.StartNew();
+            if (!SharedTimeBuffer.IsInitialized) SharedTimeBuffer.Initialize(Program.GetRenderer());
+
+            SharedTimeBuffer.UpdateInstance(new ShaderTimeData
+            {
+                FrameNumber = unchecked((uint)Program.FrameNumber),
+                DeltaTime = (float)dt,
+                RealTimeSinceStart = (float)timeSinceStart?.Elapsed.TotalSeconds,
+                TimeSinceStart = (float)Universe.GetElapsedSeconds(),
+                TimeWarpSpeed = (float)Universe.SimulationSpeed,
+            });
+        }
+
+        #region deprecated gauge canvas patches
         // No working test case available
 
         //      private static FieldInfo CanvasRenderer_canvas =
@@ -126,6 +147,7 @@ namespace ShaderExtensions
         //    if (__instance is GaugeCanvasEx canvasEx && canvasEx.HasPost)
         //        canvasEx.PostRenderer.Render(commandBuffer, activeViewport);
         //}
+        #endregion
 
         [HarmonyPatch(typeof(Program), "RenderGame"), HarmonyTranspiler, HarmonyDebug]
         internal static IEnumerable<CodeInstruction> Program_RenderGame_Transpile(
@@ -207,6 +229,9 @@ namespace ShaderExtensions
         internal static void Program_RebuildRenderer_Postfix()
         {
             //ImGuiRenderers.RebuildAll();
+            if (!SharedTimeBuffer.IsInitialized)
+                SharedTimeBuffer.Initialize(Program.GetRenderer());
+
             PostProcessingHandler.Rebuild();
             GlobalPostShaderHandler.Rebuild();
         }
