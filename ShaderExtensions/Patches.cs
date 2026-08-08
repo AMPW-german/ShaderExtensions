@@ -184,41 +184,23 @@ namespace ShaderExtensions
                 rebuilt = true;
             }
 
-            bool needsOffscreenTargetRebuild =
-                GlobalPostShaderHandler.offscreenTarget2 == null ||
-                GlobalPostShaderHandler.offscreenTarget2.Extent.Width != renderer.Extent.Width ||
-                GlobalPostShaderHandler.offscreenTarget2.Extent.Height != renderer.Extent.Height;
+            bool needsRebuild =
+                GlobalPostShaderHandler.SourceTarget == null ||
+                GlobalPostShaderHandler.SourceTarget.Extent.Width != renderer.Extent.Width ||
+                GlobalPostShaderHandler.SourceTarget.Extent.Height != renderer.Extent.Height;
 
-            if (needsOffscreenTargetRebuild)
+            if (needsRebuild)
             {
-                renderer.Device.WaitIdle();
-
-                GlobalPostShaderHandler.offscreenTarget2?.Dispose();
-                GlobalPostShaderHandler.offscreenTarget2 = new OffscreenTarget(
-                    renderer,
-                    "ShaderExtensionsImGuiPreRender",
-                    renderer.Extent,
-                    renderer.ColorFormat,
-                    renderer.DepthFormat
-                );
-                GlobalPostShaderHandler.offscreenTarget2.BuildFramebuffer(Program.MainPass.Pass);
-
                 PostProcessingHandler.Rebuild();
                 GlobalPostShaderHandler.Rebuild();
             }
 
-            ImGuiRenderers.Render(Program.GetRenderer(), commandBuffer);
+            ImGuiRenderers.Render(renderer, commandBuffer);
 
+            // Post process the game image before the UI pass composites it onto the swapchain.
             PostProcessingHandler.RenderNow(commandBuffer);
 
-            VkRenderPassBeginInfo beginInfo2 = new VkRenderPassBeginInfo();
-            beginInfo2.RenderPass = Program.MainPass.Pass;
-            beginInfo2.Framebuffer = GlobalPostShaderHandler.offscreenTarget2.FrameBuffer;
-            beginInfo2.RenderArea = new VkRect2D(renderer.Extent);
-            beginInfo2.ClearValues = (VkClearValue*)Program.MainPass.ClearValues.Ptr;
-            beginInfo2.ClearValueCount = 2;
-
-            commandBuffer.BeginRenderPass(in beginInfo2, contents);
+            commandBuffer.BeginRenderPass(in beginInfo, contents);
         }
 
         [HarmonyPatch(typeof(Program), nameof(Program.RebuildRenderer)), HarmonyPostfix]

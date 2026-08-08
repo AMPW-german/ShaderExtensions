@@ -16,8 +16,7 @@ namespace ShaderExtensions.ImGuiShader
     public class ImGuiPostRenderer : RenderTechnique
     {
         public readonly ImGuiBaseRenderer BaseRenderer;
-        private RenderTarget renderTarget;
-        private readonly VkRenderPass renderPass;
+        private readonly RenderTarget renderTarget;
 
         private readonly DescriptorSetLayoutEx bindingLayout;
         private readonly VkDescriptorSet bindingSet;
@@ -25,16 +24,32 @@ namespace ShaderExtensions.ImGuiShader
         private readonly ShaderEx shader;
 
         public ImTextureRef ImGuiTexture { get; private set; }
-        public Framebuffer.FramebufferAttachment Target => renderTarget.ColorImage;
+        public RenderImage Target => renderTarget.ColorImage;
 
         public unsafe ImGuiPostRenderer(Renderer renderer, VkExtent2D extent, ShaderReference vert, ShaderEx frag)
-          : base(nameof(ImGuiPostRenderer), renderer, Program.MainPass, [vert, frag])
+          : this(
+              renderer,
+              new RenderTarget(
+                renderer,
+                $"{nameof(ImGuiPostRenderer)}_{Guid.NewGuid():N}",
+                extent,
+                VkFormat.R8G8B8A8UNorm,
+                VkFormat.Undefined),
+              vert,
+              frag)
         {
+        }
+
+        private unsafe ImGuiPostRenderer(
+          Renderer renderer,
+          RenderTarget renderTarget,
+          ShaderReference vert,
+          ShaderEx frag)
+          : base(nameof(ImGuiPostRenderer), renderer, renderTarget, [vert, frag])
+        {
+            this.renderTarget = renderTarget;
             shader = frag;
-            BaseRenderer = new(renderer, extent);
-            renderTarget = new(renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
-            renderPass = renderTarget.CreateRenderPass();
-            renderTarget.BuildFramebuffer(renderPass);
+            BaseRenderer = new(renderer, renderTarget.Extent);
 
             ImGuiTexture = ImGuiBackend.Vulkan.AddTexture(
               Program.LinearClampedSampler,
@@ -89,7 +104,6 @@ namespace ShaderExtensions.ImGuiShader
         protected override VertexInput MakeVertexInput() => null;
 
         protected override void OnRebuildFrameResources() => CreatePipeline(
-          renderPass,
           VkPrimitiveTopology.TriangleStrip,
           VkCullModeFlags.BackBit,
           VkFrontFace.CounterClockwise,
@@ -104,9 +118,7 @@ namespace ShaderExtensions.ImGuiShader
             BaseRenderer.Rebuild(extent);
 
             ImGuiBackend.Vulkan.RemoveTexture(ImGuiTexture);
-            renderTarget.Dispose();
-            renderTarget = new(Renderer, this.GetHashCode().ToString(), extent, VkFormat.R8G8B8A8UNorm, VkFormat.Undefined);
-            renderTarget.BuildFramebuffer(renderPass);
+            renderTarget.Rebuild((int)extent.Width, (int)extent.Height);
             ImGuiTexture = ImGuiBackend.Vulkan.AddTexture(
               Program.LinearClampedSampler,
               renderTarget.ColorImage.ImageView);
@@ -138,21 +150,14 @@ namespace ShaderExtensions.ImGuiShader
             var pxBounds = bounds.X;
             var uvBounds = bounds.Y;
 
-            commandBuffer.TransitionImages2([
-              new ImageTransition(
-            BaseRenderer.Target,
-            ImageBarrierInfo.Presets.ColorAttachmentWrite,
-            ImageBarrierInfo.Presets.SampledReadFragment
-          )]);
-
             var extent = new VkExtent2D(renderTarget.Extent.Width, renderTarget.Extent.Height);
             var rect = new VkRect2D(extent);
-            commandBuffer.BeginRenderPass(new VkRenderPassBeginInfo
-            {
-                RenderPass = renderPass,
-                Framebuffer = renderTarget.FrameBuffer,
-                RenderArea = rect,
-            }, VkSubpassContents.Inline);
+            renderTarget.BeginRendering(
+              commandBuffer,
+              default,
+              default,
+              VkAttachmentLoadOp.Clear,
+              VkAttachmentLoadOp.DontCare);
 
             commandBuffer.BindPipeline(VkPipelineBindPoint.Graphics, Pipeline);
 
@@ -177,7 +182,10 @@ namespace ShaderExtensions.ImGuiShader
 
             commandBuffer.Draw(4, 1, 0, 0);
 
-            commandBuffer.EndRenderPass();
+            renderTarget.EndRendering(
+              commandBuffer,
+              ImageBarrierInfo.Presets.SampledReadF,
+              default);
 
             // replace draw list with image draw
             var vcount = drawList.VtxBuffer.Count;

@@ -1,14 +1,14 @@
 using KSA;
-using static KSA.Framebuffer;
+using KSA.Rendering;
 
 namespace ShaderExtensions.PostProcessing
 {
-    internal readonly record struct PostProcessingInputKey(bool PreImgui, int RenderPassId, int SubpassId);
+    internal readonly record struct PostProcessingInputKey(bool PreImgui, int RenderPassId);
 
     internal static class PostProcessingInputResolver
     {
-        private static readonly Dictionary<PostProcessingInputKey, FramebufferAttachment> Inputs = [];
-        private static readonly Dictionary<PostProcessingInputKey, FramebufferAttachment> Outputs = [];
+        private static readonly Dictionary<PostProcessingInputKey, RenderImage> Inputs = [];
+        private static readonly Dictionary<PostProcessingInputKey, RenderImage> Outputs = [];
 
         public static void Clear(bool preImgui)
         {
@@ -18,23 +18,23 @@ namespace ShaderExtensions.PostProcessing
                 Outputs.Remove(key);
         }
 
-        public static void RegisterInput(bool preImgui, int renderPassId, int subpassId, FramebufferAttachment attachment)
+        public static void RegisterInput(bool preImgui, int renderPassId, RenderImage attachment)
         {
-            Inputs[new PostProcessingInputKey(preImgui, renderPassId, subpassId)] = attachment;
+            Inputs[new PostProcessingInputKey(preImgui, renderPassId)] = attachment;
         }
 
-        public static void RegisterOutput(bool preImgui, int renderPassId, int subpassId, FramebufferAttachment attachment)
+        public static void RegisterOutput(bool preImgui, int renderPassId, RenderImage attachment)
         {
-            Outputs[new PostProcessingInputKey(preImgui, renderPassId, subpassId)] = attachment;
+            Outputs[new PostProcessingInputKey(preImgui, renderPassId)] = attachment;
         }
 
         public static void Resolve(PostProcessingInputReference input)
         {
-            PostProcessingInputKey key = new(input.PreImgui, input.RenderPassId, input.SubpassId);
-            if (!Inputs.TryGetValue(key, out FramebufferAttachment attachment))
+            PostProcessingInputKey key = new(input.PreImgui, input.RenderPassId);
+            if (!Inputs.TryGetValue(key, out RenderImage attachment))
             {
                 string stage = input.PreImgui ? "pre-imgui" : "post-imgui";
-                throw new InvalidOperationException($"No {stage} post-processing input found for RenderPassId {input.RenderPassId}, SubpassId {input.SubpassId}.");
+                throw new InvalidOperationException($"No {stage} post-processing input found for RenderPassId {input.RenderPassId}.");
             }
 
             input.Resolve(attachment);
@@ -42,11 +42,11 @@ namespace ShaderExtensions.PostProcessing
 
         public static void Resolve(PostProcessingOutputReference output)
         {
-            PostProcessingInputKey key = new(output.PreImgui, output.RenderPassId, output.SubpassId);
-            if (!Outputs.TryGetValue(key, out FramebufferAttachment attachment))
+            PostProcessingInputKey key = new(output.PreImgui, output.RenderPassId);
+            if (!Outputs.TryGetValue(key, out RenderImage attachment))
             {
                 string stage = output.PreImgui ? "pre-imgui" : "post-imgui";
-                throw new InvalidOperationException($"No {stage} post-processing output found for RenderPassId {output.RenderPassId}, SubpassId {output.SubpassId}.");
+                throw new InvalidOperationException($"No {stage} post-processing output found for RenderPassId {output.RenderPassId}.");
             }
 
             output.Resolve(attachment);

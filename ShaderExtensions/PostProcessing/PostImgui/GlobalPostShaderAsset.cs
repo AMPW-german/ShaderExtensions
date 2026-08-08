@@ -6,24 +6,46 @@ using System.Xml.Serialization;
 namespace ShaderExtensions.PostProcessing.PostImgui
 {
     [KxAsset("GlobalPostShader")]
-    public class GlobalPostShaderAsset : ShaderEx
+    public class GlobalPostShaderAsset : ShaderEx, IPostProcessingShader, IPostProcessingLegacyMetadata
     {
         [XmlAttribute]
         public int RenderPassId = 0;
 
+        /// <summary>No longer supported. Kept only so shaders that still declare it can be rejected with a clear message.</summary>
         [XmlAttribute]
-        public int SubpassId = 0;
+        public int SubpassId = -1;
 
+        /// <summary>No longer supported. Kept only so shaders that still declare it can be rejected with a clear message.</summary>
         [XmlAttribute]
         public bool RequiresUniqueRenderpass = false;
 
         [XmlAttribute]
         public string VertexShaderID = "ScreenspaceVert";
 
-        public static List<GlobalPostShaderAsset> AllShaders = new();
-        public static SortedDictionary<int, SortedDictionary<int, List<GlobalPostShaderAsset>>> ShadersByPassAndSubpass = new();
+        public static List<GlobalPostShaderAsset> AllShaders = [];
 
         public ShaderReference VertexShader => ModLibrary.Get<ShaderReference>(VertexShaderID);
+
+        int IPostProcessingShader.PassId => RenderPassId;
+        ShaderReference IPostProcessingShader.VertexShaderReference => VertexShader;
+
+        bool IPostProcessingLegacyMetadata.HasUnsupportedMetadata(out string reason)
+        {
+            if (SubpassId >= 0)
+            {
+                reason = $"it declares {nameof(SubpassId)}={SubpassId}";
+                return true;
+            }
+
+            if (RequiresUniqueRenderpass)
+            {
+                reason = $"it declares {nameof(RequiresUniqueRenderpass)}=true";
+                return true;
+            }
+
+            reason = null;
+            return false;
+        }
 
         public override void OnDataLoad(Mod mod)
         {
@@ -34,19 +56,6 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                 output.Initialize(this);
 
             AllShaders.Add(this);
-
-            if (!ShadersByPassAndSubpass.TryGetValue(RenderPassId, out SortedDictionary<int, List<GlobalPostShaderAsset>> value1))
-            {
-                value1 = new();
-                ShadersByPassAndSubpass[RenderPassId] = value1;
-            }
-            if (!value1.TryGetValue(SubpassId, out List<GlobalPostShaderAsset> value))
-            {
-                value = new();
-                value1[SubpassId] = value;
-            }
-
-            value.Add(this);
         }
     }
 }

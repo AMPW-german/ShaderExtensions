@@ -1,5 +1,0 @@
-name="AircraftHUD"
-version="0.1.0"
-author="UriahGnu"
-
-assets = [ "HudAssests.xml" ]
