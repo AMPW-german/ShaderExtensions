@@ -172,7 +172,7 @@ namespace ShaderExtensions.ImGuiShader
 
             commandBuffer.BindPipeline(VkPipelineBindPoint.Graphics, Pipeline);
             commandBuffer.BindVertexBuffer(0, bufs.Vertex.Buffer);
-            commandBuffer.BindIndexBuffer(bufs.Index.Buffer, ByteSize.Zero, VkIndexType.Uint16);
+            commandBuffer.BindIndexBuffer(bufs.Index.Buffer, ByteSize.Zero, VkIndexType.UInt16);
 
             commandBuffer.SetViewport(0, [new VkViewport
         {
