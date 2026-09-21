@@ -1,10 +1,5 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup>
-    <ModName>ShaderExtensions</ModName>
-  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
-
     <ModFile Include="$(OutputPath)\$(ModName).dll" />
     <ModFile Include="..\Content\**\*" />
 

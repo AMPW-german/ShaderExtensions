@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	<Import Project="ShaderExtensions.props" />
+	<Import Project="KSADLLs.props" />
 	<PropertyGroup>
+		<ModName>ShaderExtensions</ModName>
 		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
 		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
 		<TargetFramework>net10.0</TargetFramework>
@@ -17,7 +18,7 @@
 		<Configurations>Debug;Release</Configurations>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 
-		<VersionPrefix>1.0.2</VersionPrefix>
+		<VersionPrefix>1.0.3</VersionPrefix>
 		<Version>$(VersionPrefix)</Version>
 		<AssemblyVersion>1.0.0.0</AssemblyVersion>
 		<FileVersion>$(VersionPrefix).0</FileVersion>
@@ -51,21 +52,17 @@
 
 	<ItemGroup>
 		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
-		<PackageReference Include="ModMenu.Attributes" Version="1.0.1" />
-		<PackageReference Include="StarMap.API" Version="0.3.6" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<Reference Include="KittenExtensions">
-			<HintPath>..\..\..\..\Documents\My Games\Kitten Space Agency\mods\KittenExtensions\KittenExtensions.dll</HintPath>
+		<Reference Include="StarMap.API">
+			<HintPath>$(KSAModsDir)StarMap/StarMap.API.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Update="mod.toml">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
+		<Reference Include="KittenExtensions">
+			<HintPath>$(KSAModsDir)KittenExtensions/KittenExtensions.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
 	</ItemGroup>
 
 	<Target Name="SetVersionMetadata" BeforeTargets="GetAssemblyVersion">
