@@ -1,15 +1,9 @@
 <Project>
-    <PropertyGroup>
-        <IsLocalBuild Condition="'$(GITHUB_ACTIONS)' != 'true'">true</IsLocalBuild>
-        <PublishSourceDir>$(TargetDir)</PublishSourceDir>
-    </PropertyGroup>
-
-    <!--<ItemGroup Condition="'$(IsLocalBuild)' == 'true' and '$(OS)' == 'Windows_NT'">-->
     <ItemGroup>
-        <CopyDestination Include="$(SolutionDir)Release\$(ModName)\" />
+        <CopyDestination Include="$(MSBuildProjectDirectory)/../Release/$(ModName)/" />
     </ItemGroup>
 
-    <Target Name="CopyBuildOutput" AfterTargets="Build" Condition="'$(IsLocalBuild)' == 'true' and '$(OS)' == 'Windows_NT'">
+    <Target Name="CopyBuildOutput" AfterTargets="Build">
         <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CopyToSingleDestination" Properties="SingleCopyDestination=%(CopyDestination.Identity)" />
     </Target>
 
@@ -29,5 +23,18 @@
 
         <!-- Copy preserving structure -->
         <Copy SourceFiles="@(FilesToCopy)" DestinationFiles="@(FilesToCopy->'$(SingleCopyDestination)%(RecursiveDir)%(Filename)%(Extension)')" />
+
+        <ItemGroup>
+            <ModManifestLines Include="name = &quot;$(ModName)&quot;" />
+            <ModManifestLines Include="version = &quot;v$(Version)&quot;" />
+            <ModManifestLines Include="author = &quot;$(Authors)&quot;" />
+            <ModManifestLines Include="description = &quot;$(Description)&quot;" />
+            <ModManifestLines Include="[StarMap]">
+                <Separator>$([System.Environment]::NewLine)</Separator>
+            </ModManifestLines>
+            <ModManifestLines Include="EntryAssembly = &quot;$(AssemblyName)&quot;" />
+        </ItemGroup>
+
+        <WriteLinesToFile File="$(SingleCopyDestination)mod.toml" Lines="@(ModManifestLines->'%(Separator)%(Identity)')" Overwrite="true" />
     </Target>
 </Project>

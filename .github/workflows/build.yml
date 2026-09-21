@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.x
 
@@ -86,7 +86,7 @@ jobs:
                       return asset
               raise RuntimeError(error)
 
-          def download_zip_published_dll(repo: str, repoPath: str, dll_name: str):
+          def download_zip_published_dll(repo: str, repoPath: str, dllName: str, modName: str):
               release = latest_release(repo, repoPath)
               assets = release.get("assets", [])
               zip_asset = find_asset(
@@ -103,14 +103,15 @@ jobs:
               with zipfile.ZipFile(zip_path, "r") as archive:
                   archive.extractall(extract_path)
 
-              dll_matches = list(extract_path.rglob(dll_name))
+              dll_matches = list(extract_path.rglob(dllName))
               if not dll_matches:
-                  raise RuntimeError(f"{dll_name} not found in latest {repo} zip release asset.")
+                  raise RuntimeError(f"{dllName} not found in latest {repo} zip release asset.")
 
-              target = deps_dir / dll_name
+              target = deps_dir / modName / dllName
+              target.parent.mkdir(parents=True, exist_ok=True)
               target.write_bytes(dll_matches[0].read_bytes())
 
-          def download_zip_published_dll_path(repo: str, repoPath: str, dll_name: str, dll_path: str, pdb: bool):
+          def download_zip_published_dll_path(repo: str, repoPath: str, dllName: str, modName: str, dll_path: str, pdb: bool):
               release = latest_release(repo, repoPath)
               assets = release.get("assets", [])
               zip_asset = find_asset(
@@ -127,33 +128,37 @@ jobs:
               with zipfile.ZipFile(zip_path, "r") as archive:
                   archive.extractall(extract_path)
 
-              full_path = extract_path / dll_path / dll_name
+              full_path = extract_path / dll_path / dllName
 
               if not full_path.exists():
-                  raise RuntimeError(f"{dll_name} not found at {dll_path} in latest {repo} zip release asset.")
+                  raise RuntimeError(f"{dllName} not found at {dll_path} in latest {repo} zip release asset.")
 
-              target = deps_dir / dll_name
+              target = deps_dir / modName / dllName
+              target.parent.mkdir(parents=True, exist_ok=True)
               target.write_bytes(full_path.read_bytes())
 
               if pdb:
-                  pdb_name = dll_name.replace(".dll", ".pdb")
+                  pdb_name = dllName.replace(".dll", ".pdb")
                   full_pdb_path = extract_path / dll_path / pdb_name
                   if not full_pdb_path.exists():
                       raise RuntimeError(f"{pdb_name} not found at {dll_path} in latest {repo} zip release asset.")
-                  target_pdb = deps_dir / pdb_name
+                  target_pdb = deps_dir / modName / pdb_name
+                  target.parent.mkdir(parents=True, exist_ok=True)
                   target_pdb.write_bytes(full_pdb_path.read_bytes())
 
-          def download_direct_dll(repo: str, repoPath: str, dll_name: str):
+          def download_direct_dll(repo: str, repoPath: str, dllName: str, modName: str):
               release = latest_release(repo, repoPath)
               assets = release.get("assets", [])
               dll_asset = find_asset(
                   assets,
-                  lambda a: a["name"].lower() == dll_name.lower(),
-                  f"No direct DLL asset named {dll_name} found in latest release for {repo}.",
+                  lambda a: a["name"].lower() == dllName.lower(),
+                  f"No direct DLL asset named {dllName} found in latest release for {repo}.",
               )
-              download(dll_asset["browser_download_url"], deps_dir / dll_name)
+              download(dll_asset["browser_download_url"], deps_dir / modName / dllName)
 
-          download_zip_published_dll("KittenExtensions", "tsholmes", "KittenExtensions.dll")
+          download_zip_published_dll("StarMap", "StarMapLoader", "StarMap.API.dll", "StarMap")
+          download_zip_published_dll("KittenExtensions", "tsholmes", "KittenExtensions.dll", "KittenExtensions")
+          PY
 
       - name: Validate private KSA DLL repository setting
         if: ${{ env.KSA_DLL_REPOSITORY == '' }}
@@ -210,24 +215,6 @@ jobs:
           echo "KSA version: $ksa_version"
           echo "version=$ksa_version" >> "$GITHUB_OUTPUT"
 
-      - name: Switch project references to CI DLL hint paths
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import pathlib
-          import re
-
-          project_path = pathlib.Path("ShaderExtensions/ShaderExtensions.csproj")
-          content = project_path.read_text(encoding="utf-8")
-
-          content = content.replace(
-              r"..\..\..\..\Documents\My Games\Kitten Space Agency\mods\KittenExtensions\KittenExtensions.dll",
-              "../deps/KittenExtensions.dll",
-          )
-
-          project_path.write_text(content, encoding="utf-8")
-          PY
-
       - name: Collect VersionPrefix
         id: versionprefix
         shell: bash
@@ -277,8 +264,9 @@ jobs:
           rm -rf Release/ShaderExtensions
           mkdir -p Release/ShaderExtensions
 
-          ksa_dir="$(pwd)/deps/ksa/"
-          dotnet build ShaderExtensions/ShaderExtensions.csproj -c "$CONFIGURATION" --no-restore /p:KSADir="$ksa_dir" /p:OutputPath="../Release/ShaderExtensions/"
+          deps_dir="$(pwd)/deps/"
+          ksa_dir="$deps_dir/ksa/"
+          dotnet build ShaderExtensions/ShaderExtensions.csproj -c "$CONFIGURATION" --no-restore /p:KSADir="$ksa_dir" /p:KSAModsDir="$deps_dir"
 
       - name: Compute artifact name
         id: artifact-name
@@ -303,7 +291,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact-name.outputs.name }}
-          path: Release/ShaderExtensions/
+          path: Release/
 
   release:
     runs-on: ubuntu-slim
