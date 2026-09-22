@@ -168,10 +168,6 @@ namespace ShaderExtensions
                     }
                     foreach (var inj in group)
                         AddXmlElement(attrs2, new(inj.XmlElement, inj.ChildType));
-
-
-                    //var typesField = overrides.GetType().GetField("_types", BindingFlags.NonPublic | BindingFlags.Instance);
-                    //overrides[overrideType, member.Name]
                 }
             }
         }
