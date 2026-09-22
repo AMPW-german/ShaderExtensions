@@ -13,7 +13,25 @@
         <!-- Collect files here -->
         <ItemGroup>
             <FilesToCopy Include="$(OutputPath)**\*" />
+            <ModManifestArrayItems Include="@(None)" Condition="'%(None.ModManifestArray)' != ''" />
+            <ModManifestArrayNames Include="@(ModManifestArrayItems->'%(ModManifestArray)')" />
         </ItemGroup>
+
+        <RemoveDuplicates Inputs="@(ModManifestArrayNames)">
+            <Output TaskParameter="Filtered" ItemName="UniqueModManifestArrayNames" />
+        </RemoveDuplicates>
+
+        <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CreateModManifestArrayLine"
+            Properties="ModManifestArrayName=%(UniqueModManifestArrayNames.Identity)"
+            Condition="'@(UniqueModManifestArrayNames)' != ''">
+            <Output TaskParameter="TargetOutputs" ItemName="ModManifestArrayLines" />
+        </MSBuild>
+
+        <MSBuild Projects="$(MSBuildProjectFile)" Targets="_CreateStarMapModDependencyLines"
+            Properties="StarMapModDependencyId=%(StarMapModDependency.Identity)"
+            Condition="'@(StarMapModDependency)' != ''">
+            <Output TaskParameter="TargetOutputs" ItemName="StarMapModDependencyLines" />
+        </MSBuild>
 
         <!-- Remove existing directory -->
         <RemoveDir Directories="$(SingleCopyDestination)" />
@@ -29,12 +47,52 @@
             <ModManifestLines Include="version = &quot;v$(Version)&quot;" />
             <ModManifestLines Include="author = &quot;$(Authors)&quot;" />
             <ModManifestLines Include="description = &quot;$(Description)&quot;" />
+            <ModManifestLines Include="@(ModManifestArrayLines)">
+                <Separator>$([System.Environment]::NewLine)</Separator>
+            </ModManifestLines>
             <ModManifestLines Include="[StarMap]">
                 <Separator>$([System.Environment]::NewLine)</Separator>
             </ModManifestLines>
             <ModManifestLines Include="EntryAssembly = &quot;$(AssemblyName)&quot;" />
+            <ModManifestLines Include="@(StarMapModDependencyLines)" />
         </ItemGroup>
 
         <WriteLinesToFile File="$(SingleCopyDestination)mod.toml" Lines="@(ModManifestLines->'%(Separator)%(Identity)')" Overwrite="true" />
+    </Target>
+
+    <Target Name="_CreateModManifestArrayLine" Returns="@(ModManifestArrayLine)">
+        <ItemGroup>
+            <ModManifestArrayFiles Include="@(None)" Condition="'%(None.ModManifestArray)' == '$(ModManifestArrayName)'">
+                <ManifestPath>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</ManifestPath>
+            </ModManifestArrayFiles>
+        </ItemGroup>
+        <PropertyGroup>
+            <ModManifestArrayValues>@(ModManifestArrayFiles->'&quot;%(ManifestPath)&quot;', ', ')</ModManifestArrayValues>
+        </PropertyGroup>
+        <ItemGroup>
+            <ModManifestArrayLine Include="$(ModManifestArrayName) = [ $(ModManifestArrayValues) ]" />
+        </ItemGroup>
+    </Target>
+
+    <Target Name="_CreateStarMapModDependencyLines" Returns="@(StarMapModDependencyLine)">
+        <ItemGroup>
+            <CurrentStarMapModDependency Include="@(StarMapModDependency)"
+                Condition="'%(StarMapModDependency.Identity)' == '$(StarMapModDependencyId)'" />
+        </ItemGroup>
+        <PropertyGroup>
+            <StarMapModDependencyOptional>@(CurrentStarMapModDependency->'%(Optional)')</StarMapModDependencyOptional>
+            <StarMapModDependencyOptional Condition="'$(StarMapModDependencyOptional)' == ''">false</StarMapModDependencyOptional>
+            <StarMapModDependencyOptional>$([System.String]::Copy('$(StarMapModDependencyOptional)').ToLowerInvariant())</StarMapModDependencyOptional>
+            <StarMapImportedAssemblies>@(CurrentStarMapModDependency->'%(ImportedAssemblies)')</StarMapImportedAssemblies>
+            <StarMapImportedAssemblyValues>$([System.String]::Copy('$(StarMapImportedAssemblies)').Replace(';', '&quot;, &quot;'))</StarMapImportedAssemblyValues>
+        </PropertyGroup>
+        <ItemGroup>
+            <StarMapModDependencyLine Include="[[StarMap.ModDependencies]]">
+                <Separator>$([System.Environment]::NewLine)</Separator>
+            </StarMapModDependencyLine>
+            <StarMapModDependencyLine Include="ModId = &quot;$(StarMapModDependencyId)&quot;" />
+            <StarMapModDependencyLine Include="Optional = $(StarMapModDependencyOptional)" />
+            <StarMapModDependencyLine Include="ImportedAssemblies = [ &quot;$(StarMapImportedAssemblyValues)&quot; ]" />
+        </ItemGroup>
     </Target>
 </Project>

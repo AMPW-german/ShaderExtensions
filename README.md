@@ -2,6 +2,9 @@
 
 Post Processing Shaders and uniform buffers for KSA
 
+> [!WARNING]
+> This mod requires [KittenExtensions Continued (KXC)](https://github.com/AMPW-german/KittenExtensions) as a non-optional dependency. KXC and the original KittenExtensions (KX) cannot be installed together, so remove any existing KX installation before installing KXC. KXC uses the `KittenExtensionsContinued` mod ID while retaining the `KittenExtensions` assembly name for dependent mods.
+
 Current Features:
 - Adds a `<ShaderEx>` asset that allows adding additional texture and uniform buffer bindings to fragment shaders
 - Adds push constants to `ShaderEx` shaders for small per-draw values
@@ -10,7 +13,7 @@ Current Features:
 
 ## Installation
 
-- Requires [Starmap](https://github.com/StarMapLoader/StarMap) and [KittenExtensions > v0.3.1](https://github.com/tsholmes/KittenExtensions/releases/latest)
+- Requires [Starmap](https://github.com/StarMapLoader/StarMap) and [KittenExtensions Continued > v0.3.1](https://github.com/AMPW-german/KittenExtensions/releases/latest)
 - Download zip from [Releases](https://github.com/AMPW-german/ShaderExtensions/releases/latest) and extract into game `Content` folder
 - Add to `manifest.toml` in `%USER%/my games/Kitten Space Agency`
     ```toml
@@ -19,7 +22,7 @@ Current Features:
     enabled = true
     ```
 
-This mod is based on [KittenExtensions](https://github.com/tsholmes/KittenExtensions) with large parts unmodified.
+This mod is based on [KittenExtensions](https://github.com/tsholmes/KittenExtensions).
 
 ## Post Processing Shaders
 

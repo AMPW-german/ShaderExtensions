@@ -22,7 +22,6 @@ namespace ShaderExtensions
         {
             // We want to load before main, but after all mod assemblies are loaded in
             AssetEx.Init();
-
         }
 
         internal static Stopwatch timeSinceStart;

@@ -18,7 +18,7 @@
 		<Configurations>Debug;Release</Configurations>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 
-		<VersionPrefix>1.0.3</VersionPrefix>
+		<VersionPrefix>1.0.4</VersionPrefix>
 		<Version>$(VersionPrefix)</Version>
 		<AssemblyVersion>1.0.0.0</AssemblyVersion>
 		<FileVersion>$(VersionPrefix).0</FileVersion>
@@ -60,9 +60,15 @@
 			<Private>False</Private>
 		</Reference>
 		<Reference Include="KittenExtensions">
-			<HintPath>$(KSAModsDir)KittenExtensions/KittenExtensions.dll</HintPath>
+			<HintPath>$(KSAModsDir)KittenExtensionsContinued/KittenExtensions.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<StarMapModDependency Include="KittenExtensionsContinued">
+			<ImportedAssemblies>KittenExtensions</ImportedAssemblies>
+		</StarMapModDependency>
 	</ItemGroup>
 
 	<Target Name="SetVersionMetadata" BeforeTargets="GetAssemblyVersion">
