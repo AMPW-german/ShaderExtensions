@@ -4,6 +4,7 @@ using Core;
 using KSA;
 using KSA.Rendering;
 using RenderCore;
+using System.Reflection;
 
 namespace ShaderExtensions.PostProcessing
 {
@@ -85,6 +86,12 @@ namespace ShaderExtensions.PostProcessing
             Presets.BlendState.BlendNone,
             out Pipeline);
 
+        public static int getGlobalShaderBindingsCurrentFrame()
+        {
+            FieldInfo? currentFrameField = typeof(GlobalShaderBindings)?.GetField("currentFrame", BindingFlags.NonPublic | BindingFlags.Static);
+            return (int)(currentFrameField?.GetValue(null) ?? 0);
+        }
+
         /// <summary>
         /// Records the fullscreen pass. The source image must already be in a sampled-read state.
         /// </summary>
@@ -120,11 +127,11 @@ namespace ShaderExtensions.PostProcessing
 
             Span<Brutal.ByteSize32> dynamicOffsets = stackalloc Brutal.ByteSize32[dynamicOffsetCount];
             dynamicOffsets.Clear();
-            dynamicOffsets[0] = GlobalShaderBindings.DynamicOffset(0);
+            dynamicOffsets[0] = GlobalShaderBindings.FrameOffset(0, getGlobalShaderBindingsCurrentFrame());
 
             commandBuffer.BindDescriptorSets(
                 VkPipelineBindPoint.Graphics, PipelineLayout, 0,
-                [GlobalShaderBindings.DescriptorSet, bindingSet],
+                [GlobalShaderBindings.DescriptorSet(0), bindingSet],
                 dynamicOffsets);
 
             commandBuffer.Draw(4, 1, 0, 0);
