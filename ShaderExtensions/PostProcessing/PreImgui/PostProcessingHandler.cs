@@ -2,7 +2,6 @@ using Brutal.VulkanApi;
 using Core;
 using KSA;
 using KSA.Rendering;
-using System.Reflection;
 
 namespace ShaderExtensions.PostProcessing.PreImgui
 {
@@ -13,23 +12,25 @@ namespace ShaderExtensions.PostProcessing.PreImgui
     {
         private static readonly PostProcessingChain Chain = new(preImgui: true);
 
-        private static readonly FieldInfo OffscreenTargetField =
-            typeof(Program).GetField("_offscreenTarget", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        internal static RenderTarget GameOffscreenTarget =>
-            (RenderTarget)OffscreenTargetField.GetValue(Program.Instance);
+        /// <summary>
+        /// The scene image the game composites into the final frame. With HDR active the offscreen
+        /// target is composited into the HDR present pass scene target before the UI pass runs, so
+        /// the chain has to process that image instead.
+        /// </summary>
+        internal static RenderTarget SceneTarget =>
+            Render.HdrOutput.Active ? Program.HdrPresent.GetSceneTarget() : Program.OffscreenTarget;
 
         public static void Rebuild()
         {
             Program.GetRenderer().Device.WaitIdle();
 
-            RenderTarget offscreenTarget = GameOffscreenTarget;
-            if (offscreenTarget is null) return;
+            RenderTarget sceneTarget = SceneTarget;
+            if (sceneTarget is null) return;
 
             Chain.Build(
                 "ShaderExtensions_PreImgui",
                 PostProcessingChain.FilterSupported(PostProcessingShaderAsset.AllShaders),
-                offscreenTarget.ColorImage);
+                sceneTarget.ColorImage);
         }
 
         /// <summary>
@@ -42,7 +43,8 @@ namespace ShaderExtensions.PostProcessing.PreImgui
             Chain.Render(commandBuffer);
 
             // Feed the result back into the image the game composites from.
-            PostProcessingChain.CopyTo(commandBuffer, Chain.Output, GameOffscreenTarget.ColorImage);
+            PostProcessingChain.CopyTo(commandBuffer, Chain.Output, SceneTarget.ColorImage);
+            commandBuffer.PipelineBarrier2(SceneTarget.ColorImage, ImageBarrierInfo.Presets.SampledReadVfc);
         }
 
         public static void Dispose() => Chain.Dispose();

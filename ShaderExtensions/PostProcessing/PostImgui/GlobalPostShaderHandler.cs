@@ -34,7 +34,8 @@ namespace ShaderExtensions.PostProcessing.PostImgui
         {
             if (SourceTarget is not null &&
                 SourceTarget.Extent.Width == renderer.Extent.Width &&
-                SourceTarget.Extent.Height == renderer.Extent.Height)
+                SourceTarget.Extent.Height == renderer.Extent.Height &&
+                SourceTarget.ColorImage.Format == renderer.SwapchainFormat)
             {
                 return;
             }
@@ -44,7 +45,7 @@ namespace ShaderExtensions.PostProcessing.PostImgui
                 renderer,
                 "ShaderExtensions_PostImguiSource",
                 renderer.Extent,
-                renderer.ColorFormat,
+                renderer.SwapchainFormat,
                 VkFormat.Undefined);
         }
 
