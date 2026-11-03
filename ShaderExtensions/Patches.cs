@@ -173,14 +173,25 @@ namespace ShaderExtensions
                     "EndRenderPass"
                 );
 
+            // With HDR active the UI pass renders into a separate image and HdrPresentPass.Record
+            // composites scene and UI into the swapchain right after EndRenderPass, so the chain
+            // has to run after Record. Pre-HDR builds don't have the present pass; run after
+            // EndRenderPass like before.
             matcher.MatchStartBackwards(
-                new CodeMatch(
-                    instr => instr.opcode == OpCodes.Call &&
-                             instr.operand is MethodInfo mi &&
-                             mi.Name == "EndRenderPass"
-                )
-            );
-            matcher.ThrowIfInvalid("EndRenderPass call not found");
+                CodeMatch.Calls(() => default(KSA.Rendering.PostProcessing.HdrPresentPass).Record(default, default, default)));
+
+            if (!matcher.IsValid)
+            {
+                matcher.End();
+                matcher.MatchStartBackwards(
+                    new CodeMatch(
+                        instr => instr.opcode == OpCodes.Call &&
+                                 instr.operand is MethodInfo mi &&
+                                 mi.Name == "EndRenderPass"
+                    )
+                );
+                matcher.ThrowIfInvalid("EndRenderPass call not found");
+            }
 
             matcher.Advance(1);
             matcher.InsertAndAdvance(
@@ -208,7 +219,8 @@ namespace ShaderExtensions
             bool needsRebuild =
                 GlobalPostShaderHandler.SourceTarget == null ||
                 GlobalPostShaderHandler.SourceTarget.Extent.Width != renderer.Extent.Width ||
-                GlobalPostShaderHandler.SourceTarget.Extent.Height != renderer.Extent.Height;
+                GlobalPostShaderHandler.SourceTarget.Extent.Height != renderer.Extent.Height ||
+                GlobalPostShaderHandler.SourceTarget.ColorImage.Format != renderer.SwapchainFormat;
 
             if (needsRebuild)
             {
