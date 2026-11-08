@@ -181,7 +181,7 @@ Additional bindings can only be added to a post processing shaders using one of 
   <ShaderEx Id="MyFragmentShader" Path="MyShader.frag">
     <TextureBinding Path="Texture1.png" />
     <TextureBinding Path="Texture2.png" />
-    <MyBuffer Id="MyBuf" Size="1" />
+    <MyBuffer Key="MyBuf" Size="1" />
   </ShaderEx>
 </Assets>
 ```
@@ -191,7 +191,7 @@ Additional bindings can only be added to a post processing shaders using one of 
   <FragmentEx Path="MyShader.frag">
     <TextureBinding Path="Texture1.png" />
     <TextureBinding Path="Texture2.png" />
-    <MyBuffer Id="MyBuf" Size="1" />
+    <MyBuffer Key="MyBuf" Size="1" />
   </FragmentEx>
 </Component>
 ```
@@ -234,7 +234,7 @@ namespace ShaderExtensions
 
 Then make your custom uniform buffer type.
 ```cs
-// <MyBuffer Id="MyBuf" Size="1" />, where Size is the number of sequential MyBufferUbo elements in the buffer
+// <MyBuffer Key="MyBuf" Size="1" />, where Size is the number of sequential MyBufferUbo elements in the buffer
 [SxUniformBuffer("MyBuffer")]
 [StructLayout(LayoutKind.Sequential, Pack=1)]
 public struct MyBufferUbo
@@ -252,23 +252,23 @@ public struct MyBufferUbo
 }
 ```
 
-The buffers can then be accessed via a lookup function. `Id` is not required on the buffer xml element, but it is the only way you will be able to access the buffer.
+The buffers can then be accessed via a lookup function. `Key` is not required on the buffer xml element, but it is the only way you will be able to access the buffer.
 ```cs
 Span<MyBufferUbo> data = MyBufferUbo.LookupSpan(KeyHash.Make("MyBuf"));
 ```
 
-Buffers can be shared between shaders by specifying `Id` without `Size`.
+Buffers can be shared between shaders by specifying `Key` without `Size`.
 ```xml
 <Assets>
   <ShaderEx Id="MyFragmentShader" Path="MyShader.frag">
-    <MyBuffer Id="MyBuf" Size="1" />
+    <MyBuffer Key="MyBuf" Size="1" />
   </ShaderEx>
   <ShaderEx Id="MyFragmentShader2" Path="MyShader2.frag">
-    <MyBuffer Id="MyBuf" />
+    <MyBuffer Key="MyBuf" />
   </ShaderEx>
-  <MyBuffer Id="MyBuf2" Size="1" />
+  <MyBuffer Key="MyBuf2" Size="1" />
   <ShaderEx Id="MyFragmentShader3" Path="MyShader.frag">
-    <MyBuffer Id="MyBuf2" />
+    <MyBuffer Key="MyBuf2" />
   </ShaderEx>
 </Assets>
 ```
@@ -303,7 +303,7 @@ Then make your custom push constant type. The XML element name comes from the `[
 ```cs
 using System.Runtime.InteropServices;
 
-// <MyPushConstant Id="MyPush" />
+// <MyPushConstant Key="MyPush" />
 [SxPushConstant("MyPushConstant")]
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
 public struct MyPushConstantData
@@ -321,12 +321,12 @@ Add the push constant element to the shader XML. The optional `Stage` attribute 
 ```xml
 <Assets>
   <ShaderEx Id="MyFragmentShader" Path="MyShader.frag">
-    <MyPushConstant Id="MyPush" Stage="FragmentBit" />
+    <MyPushConstant Key="MyPush" Stage="FragmentBit" />
   </ShaderEx>
 </Assets>
 ```
 
-The data can then be accessed and updated via the lookup function. `Id` is required if you want to update the push constant from code. The framework assigns lookup delegates during asset load, so only call them after the shader assets have loaded.
+The data can then be accessed and updated via the lookup function. `Key` is required if you want to update the push constant from code. The framework assigns lookup delegates during asset load, so only call them after the shader assets have loaded.
 
 ```cs
 Span<MyPushConstantData> data = MyPushConstantData.Lookup(KeyHash.Make("MyPush"));
