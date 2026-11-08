@@ -248,6 +248,37 @@ namespace ShaderExtensions
         }
     }
 
+    [HarmonyPatch]
+    internal static class GameContentTagsPatch
+    {
+        private static readonly MethodInfo BuildMethod = (typeof(ModLibrary).Assembly
+            .GetType("KSA.GameContentTags", throwOnError: true)!
+            .GetMethod("Build", BindingFlags.Static | BindingFlags.NonPublic)) ??
+          throw new InvalidOperationException("Could not find GameContentTags.Build method");
+
+        [HarmonyTargetMethod]
+        private static MethodBase TargetMethod() => BuildMethod;
+
+        [HarmonyPostfix]
+        private static void Postfix(ContentTagTable __result) => AssetEx.OnTagTable(__result);
+    }
+
+    [HarmonyPatch]
+    internal static class FileReferencePatch
+    {
+        private static readonly MethodInfo LoadMethod = typeof(FileReference).GetMethod(
+            nameof(FileReference.Load), new[] { typeof(ContentLoadOptions) }) ??
+          throw new InvalidOperationException("Could not find FileReference.Load method");
+
+        [HarmonyTargetMethod]
+        private static MethodBase TargetMethod() => LoadMethod;
+
+        // Id-only elements are references to already registered content and have no payload to load
+        [HarmonyPrefix]
+        private static bool Prefix(FileReference __instance) =>
+            !string.IsNullOrEmpty(__instance.LocalPath);
+    }
+
 
     // KSA v2026.5.10.4424 reworked the GaugeRenderer and is now GaugeBundle
     // Since I don't have a test case for this and I don't think it was used by anyone (except KSASM which wasn't updated in months), I'm leaving this patch here but commented out for now.

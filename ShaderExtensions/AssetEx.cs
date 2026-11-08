@@ -4,7 +4,6 @@ using ShaderExtensions.PostProcessing;
 using ShaderExtensions.PostProcessing.PostImgui;
 using ShaderExtensions.PostProcessing.PreImgui;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Xml.Serialization;
 
@@ -13,6 +12,7 @@ namespace ShaderExtensions
     public static class AssetEx
     {
         private static readonly Dictionary<Type, XmlExtension> xmlExtensions = [];
+        private static readonly List<(string XmlElement, Type Type)> topLevelAssets = [];
 
         public static void Init()
         {
@@ -29,30 +29,34 @@ namespace ShaderExtensions
             var overrides = XmlHelper.AttributeOverrides;
             foreach (var ext in xmlExtensions.Values)
                 ext.BuildOverrides(overrides);
-
-            var existing = new List<Type>(XmlHelper.Serializers.Keys);
-            XmlHelper.Serializers.Clear();
-            foreach (var type in existing)
-                XmlHelper.Serializers.Add(type, new(type, overrides));
-
-            [UnsafeAccessor(UnsafeAccessorKind.StaticField, Name = "<UniverseSerializer>k__BackingField")]
-            extern static ref XmlSerializer UniverseSerializer(
-                [UnsafeAccessorType("KSA.GameSaves, KSA")] object instance = null);
-            [UnsafeAccessor(UnsafeAccessorKind.StaticField, Name = "<VehicleSerializer>k__BackingField")]
-            extern static ref XmlSerializer VehicleSerializer(
-                [UnsafeAccessorType("KSA.VehicleSaves, KSA")] object instance = null);
-
-            UniverseSerializer() = GetSerializer<UniverseData>();
-            VehicleSerializer() = GetSerializer<VehicleSaveData>();
         }
 
-        public static XmlSerializer GetSerializer<T>()
+        public static void OnTagTable(ContentTagTable table)
         {
-            var type = typeof(T);
-            if (XmlHelper.Serializers.TryGetValue(type, out var serializer))
-                return serializer;
+            foreach (var ext in xmlExtensions.Values)
+                ext.BuildOverrides(table.Overrides);
 
-            return XmlHelper.Serializers[type] = new XmlSerializer(type, XmlHelper.AttributeOverrides);
+            foreach (var (xmlElement, type) in topLevelAssets
+                .OrderBy(asset => asset.XmlElement, StringComparer.Ordinal)
+                .ThenBy(asset => asset.Type.FullName, StringComparer.Ordinal))
+            {
+                try
+                {
+                    var collection = (ISerializedCollection)Activator.CreateInstance(
+                        typeof(SerializedCollection<>).MakeGenericType(type), $"sx {xmlElement}")!;
+                    table.Bind(xmlElement, type, collection);
+                }
+                catch (Exception ex)
+                {
+                    DefaultCategory.Log.Warning(
+                        $"ShaderExtensions: failed to bind <{xmlElement}> ({type.FullName}) as content: {ex.Message}");
+                }
+            }
+        }
+
+        public static void AddTopLevelAsset(Type type, string xmlElement)
+        {
+            topLevelAssets.Add((xmlElement, type));
         }
 
         private static IEnumerable<Type> GetTypes(Assembly asm)

@@ -15,7 +15,7 @@ namespace ShaderExtensions
         public Span<VkBufferView> TexelBufferView;
     }
 
-    public interface IShaderBinding : ILibraryData, IKeyed
+    public interface IShaderBinding : ILibraryData, ILookupItem
     {
         static readonly LookupCollection<IShaderBinding> Bindings = new("shader bindings");
 
@@ -25,7 +25,7 @@ namespace ShaderExtensions
         void WriteDescriptors(BindingDescriptorWrites write);
     }
 
-    public interface IShaderPushConstant : ILibraryData, IKeyed
+    public interface IShaderPushConstant : ILibraryData, ILookupItem
     {
         static readonly LookupCollection<IShaderPushConstant> PushConstants = new("shader push constants");
 
@@ -40,6 +40,10 @@ namespace ShaderExtensions
     {
         public VkDescriptorType DescriptorType => VkDescriptorType.CombinedImageSampler;
         public int DescriptorCount => 1;
+        public int LookupIndex { get; set; }
+
+        private bool IsReference() => string.IsNullOrEmpty(LocalPath);
+
         IShaderBinding IShaderBinding.Get() => IsReference() ? IShaderBinding.Bindings.Get(Hash) : this;
 
         public void WriteDescriptors(BindingDescriptorWrites write)
@@ -60,9 +64,16 @@ namespace ShaderExtensions
         }
     }
 
-    public class UniformBindingReference<T> : SerializedId, IShaderBinding, IBinder
+    public class UniformBindingReference<T> : SerializedId, IShaderBinding, IBinder, IKeyed
       where T : unmanaged
     {
+        [XmlAttribute("Key")]
+        public string Key
+        {
+            get => Id;
+            set => Id = value;
+        }
+
         public static readonly LookupCollection<UniformBindingReference<T>> Buffers =
           new($"uniform buffers of {typeof(T)}");
 
@@ -84,7 +95,7 @@ namespace ShaderExtensions
 
         public IShaderBinding Get() => IsReference() ? IShaderBinding.Bindings.Get(Hash) : this;
 
-        public override bool IsReference() => Size <= 0;
+        private bool IsReference() => Size <= 0;
 
         public override void OnDataLoad(Mod mod)
         {
@@ -119,13 +130,19 @@ namespace ShaderExtensions
             };
         }
 
-        public override SerializedId Populate() => throw new NotImplementedException();
         public override TableString.Row ToRow() => new();
     }
 
-    public class PushConstantBindingReference<T> : SerializedId, IShaderPushConstant
+    public class PushConstantBindingReference<T> : SerializedId, IShaderPushConstant, IKeyed
       where T : unmanaged
     {
+        [XmlAttribute("Key")]
+        public string Key
+        {
+            get => Id;
+            set => Id = value;
+        }
+
         public static readonly LookupCollection<PushConstantBindingReference<T>> PushConstants =
           new($"push constants of {typeof(T)}");
 
@@ -145,7 +162,6 @@ namespace ShaderExtensions
         public int SizeBytes => (int)ByteSize.Of<T>().Bytes;
 
         public IShaderPushConstant Get() => this;
-        public override bool IsReference() => false;
 
         public override void OnDataLoad(Mod mod)
         {
@@ -157,7 +173,6 @@ namespace ShaderExtensions
         public ReadOnlySpan<byte> GetData() =>
           MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref value, 1));
 
-        public override SerializedId Populate() => throw new NotImplementedException();
         public override TableString.Row ToRow() => new();
     }
 }

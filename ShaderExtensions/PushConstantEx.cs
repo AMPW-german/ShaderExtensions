@@ -24,12 +24,7 @@ namespace ShaderExtensions
                 typeof(PushConstantBindingReference<T>),
                 xmlElement
             );
-            AssetEx.AddExtension(
-              typeof(AssetBundle),
-              nameof(AssetBundle.Assets),
-              typeof(PushConstantBindingReference<T>),
-              xmlElement
-            );
+            AssetEx.AddTopLevelAsset(typeof(PushConstantBindingReference<T>), xmlElement);
 
             var spanMethod = typeof(PushConstantBindingReference<T>).GetMethod(nameof(PushConstantBindingReference<T>.GetSpan));
             var staticFields = typeof(T).GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);

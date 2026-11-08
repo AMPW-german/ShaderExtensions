@@ -36,8 +36,6 @@ namespace ShaderExtensions.PostProcessing
 
         public IShaderBinding Get() => this;
 
-        public override bool IsReference() => false;
-
         public PostProcessingOutputReference()
         {
         }
@@ -86,7 +84,6 @@ namespace ShaderExtensions.PostProcessing
             };
         }
 
-        public override SerializedId Populate() => throw new NotImplementedException();
         public override TableString.Row ToRow() => new();
     }
 }

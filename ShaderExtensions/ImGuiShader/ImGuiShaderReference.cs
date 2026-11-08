@@ -6,7 +6,7 @@ using KSA;
 namespace ShaderExtensions.ImGuiShader
 {
     [KxAsset("ImGuiShader")]
-    public class ImGuiShaderReference : SerializedId, IKeyed
+    public class ImGuiShaderReference : SerializedId, ILookupItem
     {
         public static readonly LookupCollection<ImGuiShaderReference> AllShaders = new(nameof(ImGuiShaderReference));
 
@@ -28,7 +28,6 @@ namespace ShaderExtensions.ImGuiShader
                 AllShaders.Register(this);
         }
 
-        public override SerializedId Populate() => throw new System.NotImplementedException();
         public override TableString.Row ToRow() => new();
     }
 }
