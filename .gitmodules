@@ -1,0 +1,4 @@
+[submodule "tooling"]
+	path = tooling
+	url = https://github.com/AMPW-german/KSAModTools.git
+	branch = main

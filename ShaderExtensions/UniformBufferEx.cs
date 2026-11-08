@@ -27,12 +27,7 @@ namespace ShaderExtensions
                 typeof(UniformBindingReference<T>),
                 xmlElement
             );
-            AssetEx.AddExtension(
-              typeof(AssetBundle),
-              nameof(AssetBundle.Assets),
-              typeof(UniformBindingReference<T>),
-              xmlElement
-            );
+            AssetEx.AddTopLevelAsset(typeof(UniformBindingReference<T>), xmlElement);
 
             var bufMethod = typeof(UniformBindingReference<T>).GetMethod(nameof(UniformBindingReference<>.GetBuffer));
             var memMethod = typeof(UniformBindingReference<T>).GetMethod(nameof(UniformBindingReference<>.GetMappedMemory));

@@ -306,4 +306,20 @@ namespace ShaderExtensions
             return Hash.ToString();
         }
     }
+
+    internal static class FileReferenceEx
+    {
+        public static T Get<T>(this T reference) where T : FileReference
+        {
+            if (!string.IsNullOrEmpty(reference.LocalPath))
+                return reference;
+
+            var hash = KeyHash.Make(reference.Id);
+            foreach (var binding in ModLibrary.TagTable.Bindings)
+                if (binding.Collection.TryFind(hash, out var item) && item is T result)
+                    return result;
+
+            return null!;
+        }
+    }
 }

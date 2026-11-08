@@ -1,64 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	<Import Project="KSADLLs.props" />
+	<Import Project="..\tooling\msbuild\KsaMod.props" />
+
 	<PropertyGroup>
 		<ModName>ShaderExtensions</ModName>
-		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-		<TargetFramework>net10.0</TargetFramework>
-		<TargetFrameworkVersion>net10.0</TargetFrameworkVersion>
-		<LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
-		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-		<LangVersion>latest</LangVersion>
-		<OutputPath>bin\$(Configuration)</OutputPath>
-		<AssemblyName>$(ModName)</AssemblyName>
-		<OutputType>Library</OutputType>
 
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<Configurations>Debug;Release</Configurations>
-		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-
-		<VersionPrefix>1.1.0</VersionPrefix>
-		<Version>$(VersionPrefix)</Version>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>$(VersionPrefix).0</FileVersion>
-
-		<GitShortHash>nogit</GitShortHash>
-		<InformationalVersionPostfix></InformationalVersionPostfix>
-		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+		<VersionPrefix>1.2.0</VersionPrefix>
+		<AssemblyVersion>1.2.0.0</AssemblyVersion>
 
 		<Company>AMPW</Company>
 		<Authors>AMPW</Authors>
 		<Copyright>MIT</Copyright>
 	</PropertyGroup>
 
-	<PropertyGroup>
-		<DebugSymbols>true</DebugSymbols>
-		<DebugType>portable</DebugType>
-		<ErrorReport>prompt</ErrorReport>
-		<WarningLevel>4</WarningLevel>
-		<Prefer32Bit>false</Prefer32Bit>
-	</PropertyGroup>
-
-	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-		<InformationalVersionPostfix>-debug</InformationalVersionPostfix>
-		<DefineConstants>DEBUG;TRACE</DefineConstants>
-		<Optimize>false</Optimize>
-	</PropertyGroup>
-	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-		<Optimize>true</Optimize>
-		<DefineConstants>TRACE</DefineConstants>
-	</PropertyGroup>
-
 	<ItemGroup>
-		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Reference Include="StarMap.API">
-			<HintPath>$(KSAModsDir)StarMap/StarMap.API.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
 		<Reference Include="KittenExtensions">
 			<HintPath>$(KSAModsDir)KittenExtensionsContinued/KittenExtensions.dll</HintPath>
 			<Private>False</Private>
@@ -71,18 +25,5 @@
 		</StarMapModDependency>
 	</ItemGroup>
 
-	<Target Name="SetVersionMetadata" BeforeTargets="GetAssemblyVersion">
-		<Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true">
-			<Output TaskParameter="ConsoleOutput" PropertyName="GitShortHashRaw" />
-		</Exec>
-
-		<PropertyGroup>
-			<GitShortHash Condition="'$(GitShortHashRaw)' != ''">$([System.String]::Copy('$(GitShortHashRaw)').Trim())</GitShortHash>
-			<GitShortHash Condition="'$(GitShortHash)' == ''">nogit</GitShortHash>
-			<InformationalVersion>v$(VersionPrefix).$(GitShortHash)$(InformationalVersionPostfix)</InformationalVersion>
-			<ProductVersion>$(InformationalVersion)</ProductVersion>
-		</PropertyGroup>
-	</Target>
-
-	<Import Project="CopyOutput.targets" />
+	<Import Project="..\tooling\msbuild\KsaMod.targets" />
 </Project>
