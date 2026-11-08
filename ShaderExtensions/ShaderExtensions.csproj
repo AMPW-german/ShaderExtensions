@@ -4,8 +4,8 @@
 	<PropertyGroup>
 		<ModName>ShaderExtensions</ModName>
 
-		<VersionPrefix>1.1.0</VersionPrefix>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<VersionPrefix>1.2.0</VersionPrefix>
+		<AssemblyVersion>1.2.0.0</AssemblyVersion>
 
 		<Company>AMPW</Company>
 		<Authors>AMPW</Authors>
