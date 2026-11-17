@@ -159,11 +159,11 @@ namespace ShaderExtensions
             matcher.ThrowIfInvalid("could not find ImGuiBackendVulkanImpl.RenderDrawData call in Program.RenderGame");
 
             matcher.MatchStartBackwards(
-              CodeMatch.Calls(() => default(CommandBuffer).BeginRenderPass(default, default)));
-            matcher.ThrowIfInvalid("could not find CommandBuffer.BeginRenderPass call in Program.RenderGame");
+              CodeMatch.Calls(() => default(CommandBuffer).BeginRendering(default)));
+            matcher.ThrowIfInvalid("could not find CommandBuffer.BeginRendering call in Program.RenderGame");
 
             matcher.RemoveInstruction();
-            matcher.InsertAndAdvance(CodeInstruction.Call(() => ImGuiPreRender(default, default, default)));
+            matcher.InsertAndAdvance(CodeInstruction.Call(() => ImGuiPreRender(default, default)));
 
             matcher.End();
 
@@ -206,7 +206,7 @@ namespace ShaderExtensions
 
         private static bool rebuilt = false;
         private static unsafe void ImGuiPreRender(
-          CommandBuffer commandBuffer, in VkRenderPassBeginInfo beginInfo, VkSubpassContents contents)
+          CommandBuffer commandBuffer, in VkRenderingInfo renderingInfo)
         {
             Renderer renderer = Program.GetRenderer();
 
@@ -233,7 +233,7 @@ namespace ShaderExtensions
             // Post process the game image before the UI pass composites it onto the swapchain.
             PostProcessingHandler.RenderNow(commandBuffer);
 
-            commandBuffer.BeginRenderPass(in beginInfo, contents);
+            commandBuffer.BeginRendering(in renderingInfo);
         }
 
         [HarmonyPatch(typeof(Program), nameof(Program.RebuildRenderer)), HarmonyPostfix]
